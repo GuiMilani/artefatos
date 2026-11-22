@@ -1,53 +1,52 @@
 import sharp from 'sharp';
 import path from 'node:path';
 
-// Rampas do escuro pro claro. A "padrao" é a mesma do year0001.
-export const RAMPAS: Record<string, string[]> = {
-  padrao: ['@', '#', '$', '=', '*', '!', ';', ':', '~', '-', ',', '.', ' ', ' '],
-  blocos: ['█', '▓', '▒', '░', ':', '.', ' ', ' '],
+// Character ramps from dark to light. "default" is the one year0001 used.
+export const RAMPS: Record<string, string[]> = {
+  default: ['@', '#', '$', '=', '*', '!', ';', ':', '~', '-', ',', '.', ' ', ' '],
+  blocks: ['█', '▓', '▒', '░', ':', '.', ' ', ' '],
   kana: ['ﾎ', 'ﾈ', 'ﾇ', 'ｦ', 'ﾂ', 'ﾐ', 'ｼ', 'ｰ', 'ｨ', '･', ' ', ' '],
 };
 
-export const COLUNAS = 120;
+export const COLUMNS = 120;
 
 /**
- * Converte a capa em linhas de texto no build. O navegador só anima a revelação,
- * então a home não baixa nenhuma imagem.
+ * Turns a cover image into lines of text at build time. The browser only
+ * animates the reveal, so the index page downloads no images at all.
  */
-export async function capaParaAscii(
-  capa: { src: string; fsPath?: string },
-  opts: { charset?: string; brilho?: 'max' | 'luma'; colunas?: number } = {},
+export async function coverToAscii(
+  cover: { src: string; fsPath?: string },
+  opts: { charset?: string; brightness?: 'max' | 'luma'; columns?: number } = {},
 ): Promise<string[]> {
-  const colunas = opts.colunas ?? COLUNAS;
-  const rampa = RAMPAS[opts.charset ?? 'padrao'] ?? RAMPAS.padrao;
-  const arquivo = resolverArquivo(capa);
-  const { data, info } = await sharp(arquivo)
-    .resize(colunas, colunas, { fit: 'cover' })
+  const columns = opts.columns ?? COLUMNS;
+  const ramp = RAMPS[opts.charset ?? 'default'] ?? RAMPS.default;
+  const { data, info } = await sharp(resolveFile(cover))
+    .resize(columns, columns, { fit: 'cover' })
     .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  const linhas: string[] = [];
-  const passo = rampa.length - 1;
+  const lines: string[] = [];
+  const steps = ramp.length - 1;
   for (let y = 0; y < info.height; y++) {
-    let linha = '';
+    let line = '';
     for (let x = 0; x < info.width; x++) {
       const i = (y * info.width + x) * 3;
       const r = data[i], g = data[i + 1], b = data[i + 2];
-      const v = opts.brilho === 'luma'
+      const v = opts.brightness === 'luma'
         ? (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
         : Math.max(r, g, b) / 255;
-      linha += rampa[Math.floor(v * passo)];
+      line += ramp[Math.floor(v * steps)];
     }
-    linhas.push(linha);
+    lines.push(line);
   }
-  return linhas;
+  return lines;
 }
 
-function resolverArquivo(capa: { src: string; fsPath?: string }): string {
-  if (capa.fsPath) return capa.fsPath;
-  // Em dev o src vem como /@fs/caminho/absoluto?origWidth=...
-  const limpo = decodeURIComponent(capa.src.split('?')[0]);
-  if (limpo.startsWith('/@fs/')) return limpo.slice(4);
-  return path.resolve(limpo.replace(/^\//, ''));
+function resolveFile(cover: { src: string; fsPath?: string }): string {
+  if (cover.fsPath) return cover.fsPath;
+  // In dev the src looks like /@fs/absolute/path?origWidth=...
+  const clean = decodeURIComponent(cover.src.split('?')[0]);
+  if (clean.startsWith('/@fs/')) return clean.slice(4);
+  return path.resolve(clean.replace(/^\//, ''));
 }

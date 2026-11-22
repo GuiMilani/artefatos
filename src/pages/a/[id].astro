@@ -1,98 +1,98 @@
 ---
 import { Picture } from 'astro:assets';
 import Base from '../../layouts/Base.astro';
-import { listarArtefatos, imagemDo, arquivoDo, type Artefato } from '../../lib/artefatos';
-import { capaParaAscii } from '../../lib/ascii';
+import { listArtifacts, imageOf, fileOf, type Artifact } from '../../lib/artifacts';
+import { coverToAscii } from '../../lib/ascii';
 
 export async function getStaticPaths() {
-  const lista = await listarArtefatos();
-  return lista.map((artefato, i) => ({
-    params: { id: artefato.id },
+  const list = await listArtifacts();
+  return list.map((artifact, i) => ({
+    params: { id: artifact.id },
     props: {
-      artefato,
-      posicao: i + 1,
-      total: lista.length,
-      anterior: lista[(i - 1 + lista.length) % lista.length],
-      proximo: lista[(i + 1) % lista.length],
+      artifact,
+      position: i + 1,
+      total: list.length,
+      previous: list[(i - 1 + list.length) % list.length],
+      next: list[(i + 1) % list.length],
     },
   }));
 }
 
 interface Props {
-  artefato: Artefato;
-  posicao: number;
+  artifact: Artifact;
+  position: number;
   total: number;
-  anterior: Artefato;
-  proximo: Artefato;
+  previous: Artifact;
+  next: Artifact;
 }
 
-const { artefato, posicao, total, anterior, proximo } = Astro.props;
-const { id, data } = artefato;
+const { artifact, position, total, previous, next } = Astro.props;
+const { id, data } = artifact;
 const base = import.meta.env.BASE_URL;
 const pad = (n: number) => String(n).padStart(3, '0');
 const ascii = {
-  linhas: await capaParaAscii(data.capa, { charset: data.charset, brilho: data.brilho }),
+  lines: await coverToAscii(data.cover, { charset: data.charset, brightness: data.brightness }),
   seed: data.seed,
-  acento: data.acento,
+  accent: data.accent,
 };
-const tem3d = data.blocos.some((b) => b.tipo === 'modelo3d');
+const has3d = data.blocks.some((b) => b.type === 'model3d');
 ---
-<Base titulo={`${data.numero} ${data.titulo} · artefatos`} acento={data.acento}>
-  <header class="topo">
+<Base title={`${data.number} ${data.title} · artefatos`} accent={data.accent}>
+  <header class="header">
     <a href={base}>← artefatos</a>
-    <span>{pad(posicao)}/{pad(total)}</span>
+    <span>{pad(position)}/{pad(total)}</span>
   </header>
 
-  <main class="artefato">
-    <section class="capa">
-      <canvas id="ascii" role="img" aria-label={`capa de ${data.titulo} em ASCII`}></canvas>
-      <dl class="ficha">
-        <dt class="sr">número</dt><dd class="num">{data.numero}</dd>
-        <dt class="sr">título</dt><dd class="titulo">{data.titulo}<span class="cursor" aria-hidden="true"></span></dd>
-        <dt class="sr">onde e quando</dt><dd>{[data.local, data.periodo].filter(Boolean).join(' · ')}</dd>
-        <dt class="sr">mídias</dt><dd>{data.midias.join(' / ')}</dd>
+  <main class="artifact">
+    <section class="cover">
+      <canvas id="ascii" role="img" aria-label={`ASCII cover of ${data.title}`}></canvas>
+      <dl class="sheet">
+        <dt class="sr-only">number</dt><dd class="num">{data.number}</dd>
+        <dt class="sr-only">title</dt><dd class="title">{data.title}<span class="cursor" aria-hidden="true"></span></dd>
+        <dt class="sr-only">place and period</dt><dd>{[data.place, data.period].filter(Boolean).join(' · ')}</dd>
+        <dt class="sr-only">media</dt><dd>{data.media.join(' / ')}</dd>
       </dl>
     </section>
 
-    {data.blocos.map((b) => {
-      if (b.tipo === 'foto' || b.tipo === 'scan') {
+    {data.blocks.map((b) => {
+      if (b.type === 'photo' || b.type === 'scan') {
         return (
-          <figure class:list={['bloco', b.tipo, { pixelado: b.tipo === 'foto' && b.pixelado }]}>
+          <figure class:list={['block', b.type, { pixelated: b.type === 'photo' && b.pixelated }]}>
             <Picture
-              src={imagemDo(id, b.src)}
+              src={imageOf(id, b.src)}
               formats={['avif', 'webp']}
               widths={[480, 800, 1200]}
               sizes="(min-width: 900px) 720px, 100vw"
-              quality={b.tipo === 'foto' ? 82 : 70}
-              alt={b.legenda ?? ''}
+              quality={b.type === 'photo' ? 82 : 70}
+              alt={b.caption ?? ''}
               loading="lazy"
             />
-            {b.legenda && <figcaption>{b.legenda}</figcaption>}
+            {b.caption && <figcaption>{b.caption}</figcaption>}
           </figure>
         );
       }
-      if (b.tipo === 'texto') {
-        return <p class="bloco texto">{b.conteudo}</p>;
+      if (b.type === 'text') {
+        return <p class="block text">{b.content}</p>;
       }
-      if (b.tipo === 'audio') {
+      if (b.type === 'audio') {
         return (
-          <div class="bloco audio" data-audio>
-            <audio src={arquivoDo(id, b.src)} preload="metadata" loop={b.loop}></audio>
-            <button type="button" aria-label={`tocar ${b.titulo ?? 'áudio'}`}>
-              <span class="estado">▶</span>
-              <span class="faixa">{b.titulo ?? 'som'}</span>
-              <span class="tempo">--:--</span>
+          <div class="block audio" data-audio>
+            <audio src={fileOf(id, b.src)} preload="metadata" loop={b.loop}></audio>
+            <button type="button" aria-label={`play ${b.title ?? 'audio'}`}>
+              <span class="state">▶</span>
+              <span class="track">{b.title ?? 'som'}</span>
+              <span class="time">--:--</span>
             </button>
-            <span class="barra" aria-hidden="true"><span></span></span>
+            <span class="bar" aria-hidden="true"><span></span></span>
           </div>
         );
       }
-      if (b.tipo === 'video') {
+      if (b.type === 'video') {
         return (
-          <figure class="bloco video">
+          <figure class="block video">
             <video
-              src={arquivoDo(id, b.src)}
-              poster={b.poster ? arquivoDo(id, b.poster) : undefined}
+              src={fileOf(id, b.src)}
+              poster={b.poster ? fileOf(id, b.poster) : undefined}
               autoplay
               muted
               loop={b.loop}
@@ -102,21 +102,21 @@ const tem3d = data.blocos.some((b) => b.tipo === 'modelo3d');
           </figure>
         );
       }
-      if (b.tipo === 'modelo3d') {
+      if (b.type === 'model3d') {
         return (
-          <figure class="bloco modelo">
+          <figure class="block model">
             <model-viewer
-              src={arquivoDo(id, b.src)}
-              poster={b.poster ? arquivoDo(id, b.poster) : undefined}
+              src={fileOf(id, b.src)}
+              poster={b.poster ? fileOf(id, b.poster) : undefined}
               camera-controls
               touch-action="pan-y"
               auto-rotate
               shadow-intensity="0"
               exposure="1"
               ar
-              alt={b.legenda ?? `objeto 3D de ${data.titulo}`}
+              alt={b.caption ?? `3D object from ${data.title}`}
             ></model-viewer>
-            {b.legenda && <figcaption>{b.legenda}</figcaption>}
+            {b.caption && <figcaption>{b.caption}</figcaption>}
           </figure>
         );
       }
@@ -124,14 +124,14 @@ const tem3d = data.blocos.some((b) => b.tipo === 'modelo3d');
     })}
   </main>
 
-  <nav class="rodape">
-    <a href={`${base}a/${anterior.id}/`}>← {anterior.data.numero}</a>
+  <nav class="pager">
+    <a href={`${base}a/${previous.id}/`}>← {previous.data.number}</a>
     <a href={base}>índice</a>
-    <a href={`${base}a/${proximo.id}/`}>{proximo.data.numero} →</a>
+    <a href={`${base}a/${next.id}/`}>{next.data.number} →</a>
   </nav>
 
-  <script type="application/json" id="dados" set:html={JSON.stringify(ascii)} />
-  {tem3d && (
+  <script type="application/json" id="data" set:html={JSON.stringify(ascii)} />
+  {has3d && (
     <script
       is:inline
       type="module"
@@ -141,33 +141,33 @@ const tem3d = data.blocos.some((b) => b.tipo === 'modelo3d');
 </Base>
 
 <style>
-  .artefato {
-    padding: calc(var(--topo) + 8px) var(--margem) 0;
+  .artifact {
+    padding: calc(var(--header) + 8px) var(--gutter) 0;
     max-width: 720px;
     margin: 0 auto;
   }
 
-  .capa canvas { display: block; width: 100%; aspect-ratio: 1; }
+  .cover canvas { display: block; width: 100%; aspect-ratio: 1; }
 
-  .ficha {
+  .sheet {
     margin: 16px 0 0;
     padding-top: 8px;
-    border-top: 1px solid var(--tinta);
+    border-top: 1px solid var(--ink);
     text-transform: lowercase;
   }
-  .ficha dd { margin: 0; }
-  .ficha .num { color: var(--acento); }
-  .ficha .titulo { text-transform: uppercase; }
+  .sheet dd { margin: 0; }
+  .sheet .num { color: var(--accent); }
+  .sheet .title { text-transform: uppercase; }
 
-  .bloco { margin: 18vh 0 0; }
-  .bloco :global(img), .bloco video { display: block; width: 100%; height: auto; }
+  .block { margin: 18vh 0 0; }
+  .block :global(img), .block video { display: block; width: 100%; height: auto; }
   .scan { background: #fff; padding: 12px; }
-  figcaption { margin-top: 6px; color: var(--cinza); text-transform: lowercase; }
+  .pixelated :global(img) { image-rendering: pixelated; }
+  figcaption { margin-top: 6px; color: var(--grey); text-transform: lowercase; }
 
-  .texto { max-width: 42ch; text-transform: lowercase; white-space: pre-line; }
-  .pixelado :global(img) { image-rendering: pixelated; }
+  .text { max-width: 42ch; text-transform: lowercase; white-space: pre-line; }
 
-  .audio { border-top: 1px solid var(--tinta); padding-top: 8px; }
+  .audio { border-top: 1px solid var(--ink); padding-top: 8px; }
   .audio button {
     all: unset;
     cursor: pointer;
@@ -178,11 +178,11 @@ const tem3d = data.blocos.some((b) => b.tipo === 'modelo3d');
     font: inherit;
     text-transform: lowercase;
   }
-  .audio .estado { color: var(--acento); }
-  .audio .barra { display: block; height: 1px; margin-top: 8px; background: var(--cinza-claro); }
-  .audio .barra span { display: block; height: 100%; width: 0; background: var(--acento); }
+  .audio .state { color: var(--accent); }
+  .audio .bar { display: block; height: 1px; margin-top: 8px; background: var(--grey-light); }
+  .audio .bar span { display: block; height: 100%; width: 0; background: var(--accent); }
 
-  .modelo model-viewer {
+  .model model-viewer {
     display: block;
     width: 100%;
     aspect-ratio: 1;
@@ -190,10 +190,10 @@ const tem3d = data.blocos.some((b) => b.tipo === 'modelo3d');
     --poster-color: transparent;
   }
 
-  .rodape {
+  .pager {
     display: flex;
     justify-content: space-between;
-    padding: 18vh var(--margem) calc(24px + env(safe-area-inset-bottom));
+    padding: 18vh var(--gutter) calc(24px + env(safe-area-inset-bottom));
     max-width: 720px;
     margin: 0 auto;
   }
@@ -203,29 +203,29 @@ const tem3d = data.blocos.some((b) => b.tipo === 'modelo3d');
   import { AsciiCanvas } from '../../lib/ascii-canvas';
 
   const canvas = document.getElementById('ascii') as HTMLCanvasElement;
-  const dados = JSON.parse(document.getElementById('dados')!.textContent!);
+  const data = JSON.parse(document.getElementById('data')!.textContent!);
   const ascii = new AsciiCanvas(canvas);
-  const ajustar = () => ascii.redimensionar(canvas.parentElement!.clientWidth);
-  ajustar();
-  ascii.revelar(dados);
-  window.addEventListener('resize', ajustar);
+  const fit = () => ascii.resize(canvas.parentElement!.clientWidth);
+  fit();
+  ascii.reveal(data);
+  window.addEventListener('resize', fit);
 
-  // Player de áudio mínimo: um toque toca/pausa, só um som por vez.
+  // Minimal audio player: one tap plays or pauses, one sound at a time.
   const fmt = (s: number) =>
     Number.isFinite(s) ? `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '--:--';
   const players = [...document.querySelectorAll<HTMLElement>('[data-audio]')];
   players.forEach((el) => {
     const audio = el.querySelector('audio')!;
-    const estado = el.querySelector('.estado')!;
-    const tempo = el.querySelector('.tempo')!;
-    const barra = el.querySelector<HTMLElement>('.barra span')!;
-    audio.addEventListener('loadedmetadata', () => (tempo.textContent = fmt(audio.duration)));
+    const state = el.querySelector('.state')!;
+    const time = el.querySelector('.time')!;
+    const bar = el.querySelector<HTMLElement>('.bar span')!;
+    audio.addEventListener('loadedmetadata', () => (time.textContent = fmt(audio.duration)));
     audio.addEventListener('timeupdate', () => {
-      tempo.textContent = `${fmt(audio.currentTime)} / ${fmt(audio.duration)}`;
-      barra.style.width = `${(audio.currentTime / audio.duration) * 100 || 0}%`;
+      time.textContent = `${fmt(audio.currentTime)} / ${fmt(audio.duration)}`;
+      bar.style.width = `${(audio.currentTime / audio.duration) * 100 || 0}%`;
     });
-    audio.addEventListener('play', () => (estado.textContent = '■'));
-    audio.addEventListener('pause', () => (estado.textContent = '▶'));
+    audio.addEventListener('play', () => (state.textContent = '■'));
+    audio.addEventListener('pause', () => (state.textContent = '▶'));
     el.querySelector('button')!.addEventListener('click', () => {
       if (audio.paused) {
         players.forEach((p) => p !== el && p.querySelector('audio')!.pause());
