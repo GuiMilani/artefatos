@@ -1,0 +1,221 @@
+---
+import Base from '../layouts/Base.astro';
+import { listarArtefatos } from '../lib/artefatos';
+import { capaParaAscii } from '../lib/ascii';
+
+const lista = await listarArtefatos();
+const base = import.meta.env.BASE_URL;
+const total = lista.length;
+const LOOP_A_PARTIR_DE = 8;
+const copias = total >= LOOP_A_PARTIR_DE ? 3 : 1;
+
+const dados = await Promise.all(
+  lista.map(async ({ id, data }) => ({
+    id,
+    url: `${base}a/${id}/`,
+    numero: data.numero,
+    titulo: data.titulo,
+    info: [data.local, data.periodo, data.midias.join('/')].filter(Boolean).join(' · '),
+    acento: data.acento,
+    seed: data.seed,
+    linhas: await capaParaAscii(data.capa, { charset: data.charset, brilho: data.brilho }),
+  })),
+);
+const pad = (n: number) => String(n).padStart(3, '0');
+---
+<Base titulo="artefatos">
+  <header class="topo">
+    <span>artefatos</span>
+    <span id="contador" aria-live="polite">{pad(1)}/{pad(total)}</span>
+  </header>
+
+  <div class="palco" id="palco">
+    <canvas id="ascii" role="img" aria-label="capa em ASCII do artefato em foco"></canvas>
+  </div>
+
+  <main>
+    <ol class="lista" id="lista" data-copias={copias} data-total={total}>
+      {Array.from({ length: copias }).flatMap((_, c) =>
+        lista.map(({ id, data }, i) => (
+          <li class="item" data-i={i} aria-hidden={c !== Math.floor(copias / 2) ? 'true' : undefined}>
+            <a href={`${base}a/${id}/`} tabindex={c !== Math.floor(copias / 2) ? -1 : undefined}>
+              <span class="num">{data.numero}</span>
+              <span class="nome">{data.titulo}<span class="cursor" aria-hidden="true"></span></span>
+              <span class="ano">{data.ano}</span>
+            </a>
+          </li>
+        )),
+      )}
+    </ol>
+  </main>
+
+  <footer class="base">
+    <span id="info"></span>
+  </footer>
+
+  <script type="application/json" id="dados" set:html={JSON.stringify(dados)} />
+</Base>
+
+<style>
+  :root {
+    --item: 26px;
+    --linha: calc(var(--topo) + 12vh); /* a linha de leitura */
+  }
+
+  :global(html) {
+    scroll-snap-type: y proximity;
+  }
+
+  .palco {
+    position: fixed;
+    top: calc(var(--linha) + var(--item));
+    bottom: var(--base);
+    left: var(--margem);
+    right: var(--margem);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    z-index: 0;
+  }
+
+  canvas { display: block; cursor: pointer; }
+
+  .lista {
+    position: relative;
+    z-index: 1;
+    list-style: none;
+    margin: 0;
+    padding: var(--linha) var(--margem) calc(100svh - var(--linha) - var(--item));
+    pointer-events: none; /* deixa o toque chegar ao canvas entre as linhas */
+  }
+
+  .item {
+    height: var(--item);
+    border-top: 1px solid var(--cinza-claro);
+    color: var(--cinza);
+    scroll-snap-align: start;
+    scroll-margin-top: var(--linha);
+    transition: color 0.15s linear;
+  }
+
+  .item a {
+    pointer-events: auto;
+    display: grid;
+    grid-template-columns: 4.5ch 1fr auto;
+    gap: 1ch;
+    align-items: center;
+    height: 100%;
+  }
+
+  .nome { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-transform: lowercase; }
+  .item .cursor { display: none; }
+
+  .item.ativo { color: var(--tinta); border-top-color: var(--tinta); }
+  .item.ativo .num { color: var(--acento); }
+  .item.ativo .nome { text-transform: uppercase; }
+  .item.ativo .cursor { display: inline-block; }
+
+  .base {
+    position: fixed;
+    inset: auto 0 0 0;
+    height: var(--base);
+    padding: 0 var(--margem) env(safe-area-inset-bottom);
+    display: flex;
+    align-items: center;
+    background: var(--papel);
+    color: var(--tinta);
+    text-transform: lowercase;
+    white-space: nowrap;
+    overflow: hidden;
+    z-index: 10;
+  }
+
+  @media (min-width: 900px) {
+    :root { --linha: calc(var(--topo) + 18vh); }
+    .lista { max-width: 560px; }
+    .palco { left: 600px; top: var(--topo); justify-content: flex-start; align-items: center; }
+  }
+</style>
+
+<script>
+  import { AsciiCanvas, type DadosAscii } from '../lib/ascii-canvas';
+  import { datilografar } from '../lib/datilografar';
+
+  type Item = DadosAscii & { id: string; url: string; numero: string; titulo: string; info: string };
+
+  const dados: Item[] = JSON.parse(document.getElementById('dados')!.textContent!);
+  const lista = document.getElementById('lista')!;
+  const palco = document.getElementById('palco')!;
+  const canvas = document.getElementById('ascii') as HTMLCanvasElement;
+  const contador = document.getElementById('contador')!;
+  const info = document.getElementById('info')!;
+  const itens = [...lista.querySelectorAll<HTMLLIElement>('.item')];
+  const total = dados.length;
+  const copias = Number(lista.dataset.copias);
+  const ascii = new AsciiCanvas(canvas);
+  const pad = (n: number) => String(n).padStart(3, '0');
+
+  const alturaItem = () => itens[0]?.getBoundingClientRect().height || 26;
+  const blocoLoop = () => total * alturaItem();
+
+  let ativo = -1;
+
+  function posicaoBruta() {
+    return Math.round(window.scrollY / alturaItem());
+  }
+
+  function ativar(k: number) {
+    const i = ((k % total) + total) % total;
+    itens.forEach((el, n) => el.classList.toggle('ativo', n === k));
+    if (i === ativo) return;
+    ativo = i;
+    const d = dados[i];
+    document.body.style.setProperty('--acento', d.acento);
+    contador.textContent = `${pad(i + 1)}/${pad(total)}`;
+    ascii.revelar(d);
+    datilografar(info, d.info);
+  }
+
+  // Loop infinito: a lista é renderizada 3 vezes e a rolagem salta um bloco
+  // inteiro quando chega perto das pontas, sem mudança visível.
+  function manterNoMeio() {
+    if (copias < 3) return;
+    const b = blocoLoop();
+    if (window.scrollY < b * 0.5) window.scrollTo(0, window.scrollY + b);
+    else if (window.scrollY > b * 1.5) window.scrollTo(0, window.scrollY - b);
+  }
+
+  let agendado = false;
+  function aoRolar() {
+    if (agendado) return;
+    agendado = true;
+    requestAnimationFrame(() => {
+      agendado = false;
+      manterNoMeio();
+      ativar(posicaoBruta());
+    });
+  }
+
+  function dimensionar() {
+    const r = palco.getBoundingClientRect();
+    ascii.redimensionar(Math.min(r.width, r.height));
+  }
+
+  // Toque numa linha inativa traz ela pra linha de leitura; na ativa, entra.
+  lista.addEventListener('click', (e) => {
+    const li = (e.target as HTMLElement).closest('.item') as HTMLLIElement | null;
+    if (!li || li.classList.contains('ativo')) return;
+    e.preventDefault();
+    window.scrollTo({ top: itens.indexOf(li) * alturaItem(), behavior: 'smooth' });
+  });
+  canvas.addEventListener('click', () => {
+    if (ativo >= 0) window.location.href = dados[ativo].url;
+  });
+
+  window.addEventListener('scroll', aoRolar, { passive: true });
+  window.addEventListener('resize', () => { dimensionar(); aoRolar(); });
+
+  dimensionar();
+  if (copias >= 3) window.scrollTo(0, blocoLoop());
+  ativar(posicaoBruta());
+</script>

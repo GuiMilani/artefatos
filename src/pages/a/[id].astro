@@ -1,0 +1,236 @@
+---
+import { Picture } from 'astro:assets';
+import Base from '../../layouts/Base.astro';
+import { listarArtefatos, imagemDo, arquivoDo, type Artefato } from '../../lib/artefatos';
+import { capaParaAscii } from '../../lib/ascii';
+
+export async function getStaticPaths() {
+  const lista = await listarArtefatos();
+  return lista.map((artefato, i) => ({
+    params: { id: artefato.id },
+    props: {
+      artefato,
+      posicao: i + 1,
+      total: lista.length,
+      anterior: lista[(i - 1 + lista.length) % lista.length],
+      proximo: lista[(i + 1) % lista.length],
+    },
+  }));
+}
+
+interface Props {
+  artefato: Artefato;
+  posicao: number;
+  total: number;
+  anterior: Artefato;
+  proximo: Artefato;
+}
+
+const { artefato, posicao, total, anterior, proximo } = Astro.props;
+const { id, data } = artefato;
+const base = import.meta.env.BASE_URL;
+const pad = (n: number) => String(n).padStart(3, '0');
+const ascii = {
+  linhas: await capaParaAscii(data.capa, { charset: data.charset, brilho: data.brilho }),
+  seed: data.seed,
+  acento: data.acento,
+};
+const tem3d = data.blocos.some((b) => b.tipo === 'modelo3d');
+---
+<Base titulo={`${data.numero} ${data.titulo} · artefatos`} acento={data.acento}>
+  <header class="topo">
+    <a href={base}>← artefatos</a>
+    <span>{pad(posicao)}/{pad(total)}</span>
+  </header>
+
+  <main class="artefato">
+    <section class="capa">
+      <canvas id="ascii" role="img" aria-label={`capa de ${data.titulo} em ASCII`}></canvas>
+      <dl class="ficha">
+        <dt class="sr">número</dt><dd class="num">{data.numero}</dd>
+        <dt class="sr">título</dt><dd class="titulo">{data.titulo}<span class="cursor" aria-hidden="true"></span></dd>
+        <dt class="sr">onde e quando</dt><dd>{[data.local, data.periodo].filter(Boolean).join(' · ')}</dd>
+        <dt class="sr">mídias</dt><dd>{data.midias.join(' / ')}</dd>
+      </dl>
+    </section>
+
+    {data.blocos.map((b) => {
+      if (b.tipo === 'foto' || b.tipo === 'scan') {
+        return (
+          <figure class:list={['bloco', b.tipo, { pixelado: b.tipo === 'foto' && b.pixelado }]}>
+            <Picture
+              src={imagemDo(id, b.src)}
+              formats={['avif', 'webp']}
+              widths={[480, 800, 1200]}
+              sizes="(min-width: 900px) 720px, 100vw"
+              quality={b.tipo === 'foto' ? 82 : 70}
+              alt={b.legenda ?? ''}
+              loading="lazy"
+            />
+            {b.legenda && <figcaption>{b.legenda}</figcaption>}
+          </figure>
+        );
+      }
+      if (b.tipo === 'texto') {
+        return <p class="bloco texto">{b.conteudo}</p>;
+      }
+      if (b.tipo === 'audio') {
+        return (
+          <div class="bloco audio" data-audio>
+            <audio src={arquivoDo(id, b.src)} preload="metadata" loop={b.loop}></audio>
+            <button type="button" aria-label={`tocar ${b.titulo ?? 'áudio'}`}>
+              <span class="estado">▶</span>
+              <span class="faixa">{b.titulo ?? 'som'}</span>
+              <span class="tempo">--:--</span>
+            </button>
+            <span class="barra" aria-hidden="true"><span></span></span>
+          </div>
+        );
+      }
+      if (b.tipo === 'video') {
+        return (
+          <figure class="bloco video">
+            <video
+              src={arquivoDo(id, b.src)}
+              poster={b.poster ? arquivoDo(id, b.poster) : undefined}
+              autoplay
+              muted
+              loop={b.loop}
+              playsinline
+              preload="metadata"
+            ></video>
+          </figure>
+        );
+      }
+      if (b.tipo === 'modelo3d') {
+        return (
+          <figure class="bloco modelo">
+            <model-viewer
+              src={arquivoDo(id, b.src)}
+              poster={b.poster ? arquivoDo(id, b.poster) : undefined}
+              camera-controls
+              touch-action="pan-y"
+              auto-rotate
+              shadow-intensity="0"
+              exposure="1"
+              ar
+              alt={b.legenda ?? `objeto 3D de ${data.titulo}`}
+            ></model-viewer>
+            {b.legenda && <figcaption>{b.legenda}</figcaption>}
+          </figure>
+        );
+      }
+      return null;
+    })}
+  </main>
+
+  <nav class="rodape">
+    <a href={`${base}a/${anterior.id}/`}>← {anterior.data.numero}</a>
+    <a href={base}>índice</a>
+    <a href={`${base}a/${proximo.id}/`}>{proximo.data.numero} →</a>
+  </nav>
+
+  <script type="application/json" id="dados" set:html={JSON.stringify(ascii)} />
+  {tem3d && (
+    <script
+      is:inline
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js"
+    ></script>
+  )}
+</Base>
+
+<style>
+  .artefato {
+    padding: calc(var(--topo) + 8px) var(--margem) 0;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  .capa canvas { display: block; width: 100%; aspect-ratio: 1; }
+
+  .ficha {
+    margin: 16px 0 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--tinta);
+    text-transform: lowercase;
+  }
+  .ficha dd { margin: 0; }
+  .ficha .num { color: var(--acento); }
+  .ficha .titulo { text-transform: uppercase; }
+
+  .bloco { margin: 18vh 0 0; }
+  .bloco :global(img), .bloco video { display: block; width: 100%; height: auto; }
+  .scan { background: #fff; padding: 12px; }
+  figcaption { margin-top: 6px; color: var(--cinza); text-transform: lowercase; }
+
+  .texto { max-width: 42ch; text-transform: lowercase; white-space: pre-line; }
+  .pixelado :global(img) { image-rendering: pixelated; }
+
+  .audio { border-top: 1px solid var(--tinta); padding-top: 8px; }
+  .audio button {
+    all: unset;
+    cursor: pointer;
+    display: grid;
+    grid-template-columns: 2ch 1fr auto;
+    gap: 1ch;
+    width: 100%;
+    font: inherit;
+    text-transform: lowercase;
+  }
+  .audio .estado { color: var(--acento); }
+  .audio .barra { display: block; height: 1px; margin-top: 8px; background: var(--cinza-claro); }
+  .audio .barra span { display: block; height: 100%; width: 0; background: var(--acento); }
+
+  .modelo model-viewer {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    background: transparent;
+    --poster-color: transparent;
+  }
+
+  .rodape {
+    display: flex;
+    justify-content: space-between;
+    padding: 18vh var(--margem) calc(24px + env(safe-area-inset-bottom));
+    max-width: 720px;
+    margin: 0 auto;
+  }
+</style>
+
+<script>
+  import { AsciiCanvas } from '../../lib/ascii-canvas';
+
+  const canvas = document.getElementById('ascii') as HTMLCanvasElement;
+  const dados = JSON.parse(document.getElementById('dados')!.textContent!);
+  const ascii = new AsciiCanvas(canvas);
+  const ajustar = () => ascii.redimensionar(canvas.parentElement!.clientWidth);
+  ajustar();
+  ascii.revelar(dados);
+  window.addEventListener('resize', ajustar);
+
+  // Player de áudio mínimo: um toque toca/pausa, só um som por vez.
+  const fmt = (s: number) =>
+    Number.isFinite(s) ? `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '--:--';
+  const players = [...document.querySelectorAll<HTMLElement>('[data-audio]')];
+  players.forEach((el) => {
+    const audio = el.querySelector('audio')!;
+    const estado = el.querySelector('.estado')!;
+    const tempo = el.querySelector('.tempo')!;
+    const barra = el.querySelector<HTMLElement>('.barra span')!;
+    audio.addEventListener('loadedmetadata', () => (tempo.textContent = fmt(audio.duration)));
+    audio.addEventListener('timeupdate', () => {
+      tempo.textContent = `${fmt(audio.currentTime)} / ${fmt(audio.duration)}`;
+      barra.style.width = `${(audio.currentTime / audio.duration) * 100 || 0}%`;
+    });
+    audio.addEventListener('play', () => (estado.textContent = '■'));
+    audio.addEventListener('pause', () => (estado.textContent = '▶'));
+    el.querySelector('button')!.addEventListener('click', () => {
+      if (audio.paused) {
+        players.forEach((p) => p !== el && p.querySelector('audio')!.pause());
+        audio.play();
+      } else audio.pause();
+    });
+  });
+</script>
