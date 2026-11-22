@@ -1,4 +1,4 @@
-// Types text letter by letter, like the catalogue tag on year0001.
+// Types text letter by letter.
 const timers = new WeakMap<HTMLElement, number>();
 
 export function typewrite(el: HTMLElement, text: string, msPerLetter = 28) {

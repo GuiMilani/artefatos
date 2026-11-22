@@ -6,7 +6,8 @@ interface Props {
   description?: string;
   accent?: string;
 }
-const { title, description = 'artefatos: production cycles by Guilherme Milani', accent } = Astro.props;
+const { title, description = 'guilty corisco · artefatos', accent } = Astro.props;
+const ogImage = new URL(`${import.meta.env.BASE_URL}og.jpg`, Astro.site).href;
 ---
 <!doctype html>
 <html lang="pt-BR">
@@ -16,6 +17,9 @@ const { title, description = 'artefatos: production cycles by Guilherme Milani',
     <meta name="description" content={description} />
     <meta name="theme-color" content="#f6f6f4" />
     <link rel="icon" href={`${import.meta.env.BASE_URL}favicon.svg`} type="image/svg+xml" />
+    <meta property="og:title" content="artefatos" />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
     <title>{title}</title>
   </head>
   <body style={accent ? `--accent:${accent}` : undefined}>

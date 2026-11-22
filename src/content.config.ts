@@ -26,7 +26,7 @@ const artifacts = defineCollection({
       cover: image(),                           // source of the ASCII cover
       seed: z.number().int().default(1),        // order of the reveal
       charset: z.enum(['default', 'blocks', 'kana']).default('default'),
-      brightness: z.enum(['max', 'luma']).default('max'), // max = faithful to year0001 (drops colour)
+      brightness: z.enum(['max', 'luma']).default('max'), // max drops colour, luma keeps it
       draft: z.boolean().default(false),
       blocks: z.array(block).default([]),
     }),

@@ -1,6 +1,6 @@
-# artefatos
+# guilty corisco · artefatos
 
-Art portfolio of Guilherme Milani, live at https://guimilani.github.io/artefatos/.
+Art portfolio of Guilherme Milani (guilty corisco), live at https://guimilani.github.io/artefatos/.
 
 Each **artifact** (*artefato*) is a self-contained production cycle: analogue photos, scans,
 tags, stickers, textures, sound, video and 3D scans. The site is meant to be a piece in itself,
@@ -8,7 +8,6 @@ mobile first.
 
 The index works like a terminal catalogue. As the list scrolls, the row crossing the reading line
 becomes active and its cover is redrawn in ASCII, bit by bit, on a canvas beneath the list.
-The ASCII reveal is modelled on the old landing page of the YEAR0001 label.
 
 ## Run locally
 
@@ -36,7 +35,7 @@ accent: "#ff2a2a"         # the artifact's single colour
 cover: ./photos/01.jpg
 seed: 3                   # changes the order of the ASCII reveal
 charset: default          # default | blocks | kana
-brightness: max           # max (faithful to year0001, drops colour) | luma
+brightness: max           # max (drops colour) | luma
 draft: false              # true hides the artifact
 blocks:
   - { type: photo, src: ./photos/01.jpg, caption: "35mm, hp5", pixelated: false }
