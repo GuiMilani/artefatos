@@ -1,6 +1,6 @@
 ---
 number: "0003"
-title: "maneki neku"
+title: "maneki neko"
 year: "2026"
 period: "2026"
 place: ""
@@ -10,5 +10,5 @@ cover: ./cover.jpg
 seed: 3
 brightness: luma
 blocks:
-  - { type: model3d, src: ./3d/maneki-neku.glb, poster: ./3d/poster.webp, caption: "bem vindo" }
+  - { type: model3d, src: ./3d/maneki-neko.glb, poster: ./3d/poster.webp, caption: "bem vindo" }
 ---
