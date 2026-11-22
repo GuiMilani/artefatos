@@ -1,12 +1,11 @@
-// Bit-by-bit reveal on a canvas, after year0001:
+// Bit-by-bit reveal on a canvas:
 // a bold font on a grid tighter than the glyphs (8px on 5px in the original),
 // so characters overlap and read as texture rather than text.
-// Unlike the original (one timer per character), this uses a single
-// requestAnimationFrame loop that draws a batch per frame, in an order shuffled by the seed.
+// A single requestAnimationFrame loop draws a batch per frame, in an order shuffled by the seed.
 
 export type AsciiData = { lines: string[]; seed: number; accent: string };
 
-const FONT_RATIO = 1.6; // 8px / 5px
+const FONT_RATIO = 1.6;
 const DURATION_MS = 1400;
 const ACCENT_SHARE = 0.025;
 

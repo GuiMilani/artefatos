@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import path from 'node:path';
 
-// Character ramps from dark to light. "default" is the one year0001 used.
+// Character ramps from dark to light.
 export const RAMPS: Record<string, string[]> = {
   default: ['@', '#', '$', '=', '*', '!', ';', ':', '~', '-', ',', '.', ' ', ' '],
   blocks: ['█', '▓', '▒', '░', ':', '.', ' ', ' '],
