@@ -1,47 +1,48 @@
 ---
 import Base from '../layouts/Base.astro';
-import { listarArtefatos } from '../lib/artefatos';
-import { capaParaAscii } from '../lib/ascii';
+import { listArtifacts } from '../lib/artifacts';
+import { coverToAscii } from '../lib/ascii';
 
-const lista = await listarArtefatos();
+const list = await listArtifacts();
 const base = import.meta.env.BASE_URL;
-const total = lista.length;
-const LOOP_A_PARTIR_DE = 8;
-const copias = total >= LOOP_A_PARTIR_DE ? 3 : 1;
+const total = list.length;
+const LOOP_FROM = 8;
+const copies = total >= LOOP_FROM ? 3 : 1;
+const middle = Math.floor(copies / 2);
 
-const dados = await Promise.all(
-  lista.map(async ({ id, data }) => ({
+const items = await Promise.all(
+  list.map(async ({ id, data }) => ({
     id,
     url: `${base}a/${id}/`,
-    numero: data.numero,
-    titulo: data.titulo,
-    info: [data.local, data.periodo, data.midias.join('/')].filter(Boolean).join(' · '),
-    acento: data.acento,
+    number: data.number,
+    title: data.title,
+    info: [data.place, data.period, data.media.join('/')].filter(Boolean).join(' · '),
+    accent: data.accent,
     seed: data.seed,
-    linhas: await capaParaAscii(data.capa, { charset: data.charset, brilho: data.brilho }),
+    lines: await coverToAscii(data.cover, { charset: data.charset, brightness: data.brightness }),
   })),
 );
 const pad = (n: number) => String(n).padStart(3, '0');
 ---
-<Base titulo="artefatos">
-  <header class="topo">
+<Base title="artefatos">
+  <header class="header">
     <span>artefatos</span>
-    <span id="contador" aria-live="polite">{pad(1)}/{pad(total)}</span>
+    <span id="counter" aria-live="polite">{pad(1)}/{pad(total)}</span>
   </header>
 
-  <div class="palco" id="palco">
-    <canvas id="ascii" role="img" aria-label="capa em ASCII do artefato em foco"></canvas>
+  <div class="stage" id="stage">
+    <canvas id="ascii" role="img" aria-label="ASCII cover of the focused artifact"></canvas>
   </div>
 
   <main>
-    <ol class="lista" id="lista" data-copias={copias} data-total={total}>
-      {Array.from({ length: copias }).flatMap((_, c) =>
-        lista.map(({ id, data }, i) => (
-          <li class="item" data-i={i} aria-hidden={c !== Math.floor(copias / 2) ? 'true' : undefined}>
-            <a href={`${base}a/${id}/`} tabindex={c !== Math.floor(copias / 2) ? -1 : undefined}>
-              <span class="num">{data.numero}</span>
-              <span class="nome">{data.titulo}<span class="cursor" aria-hidden="true"></span></span>
-              <span class="ano">{data.ano}</span>
+    <ol class="index" id="index" data-copies={copies} data-total={total}>
+      {Array.from({ length: copies }).flatMap((_, c) =>
+        list.map(({ id, data }, i) => (
+          <li class="item" data-i={i} aria-hidden={c !== middle ? 'true' : undefined}>
+            <a href={`${base}a/${id}/`} tabindex={c !== middle ? -1 : undefined}>
+              <span class="num">{data.number}</span>
+              <span class="name">{data.title}<span class="cursor" aria-hidden="true"></span></span>
+              <span class="year">{data.year}</span>
             </a>
           </li>
         )),
@@ -49,29 +50,29 @@ const pad = (n: number) => String(n).padStart(3, '0');
     </ol>
   </main>
 
-  <footer class="base">
+  <footer class="footer">
     <span id="info"></span>
   </footer>
 
-  <script type="application/json" id="dados" set:html={JSON.stringify(dados)} />
+  <script type="application/json" id="data" set:html={JSON.stringify(items)} />
 </Base>
 
 <style>
   :root {
     --item: 26px;
-    --linha: calc(var(--topo) + 12vh); /* a linha de leitura */
+    --line: calc(var(--header) + 12vh); /* the reading line */
   }
 
   :global(html) {
     scroll-snap-type: y proximity;
   }
 
-  .palco {
+  .stage {
     position: fixed;
-    top: calc(var(--linha) + var(--item));
-    bottom: var(--base);
-    left: var(--margem);
-    right: var(--margem);
+    top: calc(var(--line) + var(--item));
+    bottom: var(--footer);
+    left: var(--gutter);
+    right: var(--gutter);
     display: flex;
     justify-content: center;
     align-items: flex-start;
@@ -80,21 +81,21 @@ const pad = (n: number) => String(n).padStart(3, '0');
 
   canvas { display: block; cursor: pointer; }
 
-  .lista {
+  .index {
     position: relative;
     z-index: 1;
     list-style: none;
     margin: 0;
-    padding: var(--linha) var(--margem) calc(100svh - var(--linha) - var(--item));
-    pointer-events: none; /* deixa o toque chegar ao canvas entre as linhas */
+    padding: var(--line) var(--gutter) calc(100svh - var(--line) - var(--item));
+    pointer-events: none; /* lets taps between rows reach the canvas */
   }
 
   .item {
     height: var(--item);
-    border-top: 1px solid var(--cinza-claro);
-    color: var(--cinza);
+    border-top: 1px solid var(--grey-light);
+    color: var(--grey);
     scroll-snap-align: start;
-    scroll-margin-top: var(--linha);
+    scroll-margin-top: var(--line);
     transition: color 0.15s linear;
   }
 
@@ -107,23 +108,23 @@ const pad = (n: number) => String(n).padStart(3, '0');
     height: 100%;
   }
 
-  .nome { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-transform: lowercase; }
+  .name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-transform: lowercase; }
   .item .cursor { display: none; }
 
-  .item.ativo { color: var(--tinta); border-top-color: var(--tinta); }
-  .item.ativo .num { color: var(--acento); }
-  .item.ativo .nome { text-transform: uppercase; }
-  .item.ativo .cursor { display: inline-block; }
+  .item.active { color: var(--ink); border-top-color: var(--ink); }
+  .item.active .num { color: var(--accent); }
+  .item.active .name { text-transform: uppercase; }
+  .item.active .cursor { display: inline-block; }
 
-  .base {
+  .footer {
     position: fixed;
     inset: auto 0 0 0;
-    height: var(--base);
-    padding: 0 var(--margem) env(safe-area-inset-bottom);
+    height: var(--footer);
+    padding: 0 var(--gutter) env(safe-area-inset-bottom);
     display: flex;
     align-items: center;
-    background: var(--papel);
-    color: var(--tinta);
+    background: var(--paper);
+    color: var(--ink);
     text-transform: lowercase;
     white-space: nowrap;
     overflow: hidden;
@@ -131,91 +132,91 @@ const pad = (n: number) => String(n).padStart(3, '0');
   }
 
   @media (min-width: 900px) {
-    :root { --linha: calc(var(--topo) + 18vh); }
-    .lista { max-width: 560px; }
-    .palco { left: 600px; top: var(--topo); justify-content: flex-start; align-items: center; }
+    :root { --line: calc(var(--header) + 18vh); }
+    .index { max-width: 560px; }
+    .stage { left: 600px; top: var(--header); justify-content: flex-start; align-items: center; }
   }
 </style>
 
 <script>
-  import { AsciiCanvas, type DadosAscii } from '../lib/ascii-canvas';
-  import { datilografar } from '../lib/datilografar';
+  import { AsciiCanvas, type AsciiData } from '../lib/ascii-canvas';
+  import { typewrite } from '../lib/typewriter';
 
-  type Item = DadosAscii & { id: string; url: string; numero: string; titulo: string; info: string };
+  type Item = AsciiData & { id: string; url: string; number: string; title: string; info: string };
 
-  const dados: Item[] = JSON.parse(document.getElementById('dados')!.textContent!);
-  const lista = document.getElementById('lista')!;
-  const palco = document.getElementById('palco')!;
+  const items: Item[] = JSON.parse(document.getElementById('data')!.textContent!);
+  const index = document.getElementById('index')!;
+  const stage = document.getElementById('stage')!;
   const canvas = document.getElementById('ascii') as HTMLCanvasElement;
-  const contador = document.getElementById('contador')!;
+  const counter = document.getElementById('counter')!;
   const info = document.getElementById('info')!;
-  const itens = [...lista.querySelectorAll<HTMLLIElement>('.item')];
-  const total = dados.length;
-  const copias = Number(lista.dataset.copias);
+  const rows = [...index.querySelectorAll<HTMLLIElement>('.item')];
+  const total = items.length;
+  const copies = Number(index.dataset.copies);
   const ascii = new AsciiCanvas(canvas);
   const pad = (n: number) => String(n).padStart(3, '0');
 
-  const alturaItem = () => itens[0]?.getBoundingClientRect().height || 26;
-  const blocoLoop = () => total * alturaItem();
+  const rowHeight = () => rows[0]?.getBoundingClientRect().height || 26;
+  const loopBlock = () => total * rowHeight();
 
-  let ativo = -1;
+  let active = -1;
 
-  function posicaoBruta() {
-    return Math.round(window.scrollY / alturaItem());
+  function rawPosition() {
+    return Math.round(window.scrollY / rowHeight());
   }
 
-  function ativar(k: number) {
+  function activate(k: number) {
     const i = ((k % total) + total) % total;
-    itens.forEach((el, n) => el.classList.toggle('ativo', n === k));
-    if (i === ativo) return;
-    ativo = i;
-    const d = dados[i];
-    document.body.style.setProperty('--acento', d.acento);
-    contador.textContent = `${pad(i + 1)}/${pad(total)}`;
-    ascii.revelar(d);
-    datilografar(info, d.info);
+    rows.forEach((el, n) => el.classList.toggle('active', n === k));
+    if (i === active) return;
+    active = i;
+    const d = items[i];
+    document.body.style.setProperty('--accent', d.accent);
+    counter.textContent = `${pad(i + 1)}/${pad(total)}`;
+    ascii.reveal(d);
+    typewrite(info, d.info);
   }
 
-  // Loop infinito: a lista é renderizada 3 vezes e a rolagem salta um bloco
-  // inteiro quando chega perto das pontas, sem mudança visível.
-  function manterNoMeio() {
-    if (copias < 3) return;
-    const b = blocoLoop();
+  // Infinite loop: the list is rendered three times and the scroll position
+  // jumps by one whole block near either end, with no visible change.
+  function keepCentred() {
+    if (copies < 3) return;
+    const b = loopBlock();
     if (window.scrollY < b * 0.5) window.scrollTo(0, window.scrollY + b);
     else if (window.scrollY > b * 1.5) window.scrollTo(0, window.scrollY - b);
   }
 
-  let agendado = false;
-  function aoRolar() {
-    if (agendado) return;
-    agendado = true;
+  let scheduled = false;
+  function onScroll() {
+    if (scheduled) return;
+    scheduled = true;
     requestAnimationFrame(() => {
-      agendado = false;
-      manterNoMeio();
-      ativar(posicaoBruta());
+      scheduled = false;
+      keepCentred();
+      activate(rawPosition());
     });
   }
 
-  function dimensionar() {
-    const r = palco.getBoundingClientRect();
-    ascii.redimensionar(Math.min(r.width, r.height));
+  function fit() {
+    const r = stage.getBoundingClientRect();
+    ascii.resize(Math.min(r.width, r.height));
   }
 
-  // Toque numa linha inativa traz ela pra linha de leitura; na ativa, entra.
-  lista.addEventListener('click', (e) => {
+  // Tapping an inactive row brings it to the reading line; tapping the active one opens it.
+  index.addEventListener('click', (e) => {
     const li = (e.target as HTMLElement).closest('.item') as HTMLLIElement | null;
-    if (!li || li.classList.contains('ativo')) return;
+    if (!li || li.classList.contains('active')) return;
     e.preventDefault();
-    window.scrollTo({ top: itens.indexOf(li) * alturaItem(), behavior: 'smooth' });
+    window.scrollTo({ top: rows.indexOf(li) * rowHeight(), behavior: 'smooth' });
   });
   canvas.addEventListener('click', () => {
-    if (ativo >= 0) window.location.href = dados[ativo].url;
+    if (active >= 0) window.location.href = items[active].url;
   });
 
-  window.addEventListener('scroll', aoRolar, { passive: true });
-  window.addEventListener('resize', () => { dimensionar(); aoRolar(); });
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', () => { fit(); onScroll(); });
 
-  dimensionar();
-  if (copias >= 3) window.scrollTo(0, blocoLoop());
-  ativar(posicaoBruta());
+  fit();
+  if (copies >= 3) window.scrollTo(0, loopBlock());
+  activate(rawPosition());
 </script>
