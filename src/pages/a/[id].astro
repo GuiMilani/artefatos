@@ -93,7 +93,7 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
           <figure class="block video">
             <video
               src={fileOf(id, b.src)}
-              poster={b.poster ? fileOf(id, b.poster) : undefined}
+              poster={b.poster ? imageOf(id, b.poster).src : undefined}
               autoplay
               muted
               loop={b.loop}
@@ -108,7 +108,7 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
           <figure class="block model">
             <model-viewer
               src={fileOf(id, b.src)}
-              poster={b.poster ? fileOf(id, b.poster) : undefined}
+              poster={b.poster ? imageOf(id, b.poster).src : undefined}
               camera-controls
               touch-action="pan-y"
               auto-rotate
