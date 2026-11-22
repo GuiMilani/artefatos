@@ -66,4 +66,4 @@ blocos:
 Todo push na `main` publica o site pelo GitHub Actions
 (Settings → Pages → Source: GitHub Actions).
 
-Os artefatos `teste-*` são de exemplo. Apague as pastas quando entrarem os reais.
+Os originais em alta (WAV, scans em 7680 px) ficam fora do repo. Aqui entram versões reduzidas: imagens até 2400 px e áudio em MP3 256 kbps.

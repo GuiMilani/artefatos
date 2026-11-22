@@ -49,7 +49,7 @@ const tem3d = data.blocos.some((b) => b.tipo === 'modelo3d');
       <dl class="ficha">
         <dt class="sr">número</dt><dd class="num">{data.numero}</dd>
         <dt class="sr">título</dt><dd class="titulo">{data.titulo}<span class="cursor" aria-hidden="true"></span></dd>
-        <dt class="sr">onde e quando</dt><dd>{data.local} · {data.periodo}</dd>
+        <dt class="sr">onde e quando</dt><dd>{[data.local, data.periodo].filter(Boolean).join(' · ')}</dd>
         <dt class="sr">mídias</dt><dd>{data.midias.join(' / ')}</dd>
       </dl>
     </section>
@@ -57,7 +57,7 @@ const tem3d = data.blocos.some((b) => b.tipo === 'modelo3d');
     {data.blocos.map((b) => {
       if (b.tipo === 'foto' || b.tipo === 'scan') {
         return (
-          <figure class:list={['bloco', b.tipo]}>
+          <figure class:list={['bloco', b.tipo, { pixelado: b.tipo === 'foto' && b.pixelado }]}>
             <Picture
               src={imagemDo(id, b.src)}
               formats={['avif', 'webp']}
@@ -164,7 +164,8 @@ const tem3d = data.blocos.some((b) => b.tipo === 'modelo3d');
   .scan { background: #fff; padding: 12px; }
   figcaption { margin-top: 6px; color: var(--cinza); text-transform: lowercase; }
 
-  .texto { max-width: 34ch; text-transform: lowercase; }
+  .texto { max-width: 42ch; text-transform: lowercase; white-space: pre-line; }
+  .pixelado :global(img) { image-rendering: pixelated; }
 
   .audio { border-top: 1px solid var(--tinta); padding-top: 8px; }
   .audio button {
