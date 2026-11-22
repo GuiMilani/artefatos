@@ -112,9 +112,12 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
               camera-controls
               touch-action="pan-y"
               auto-rotate
+              auto-rotate-delay="0"
+              camera-orbit="-20deg 80deg auto"
+              rotation-per-second="18deg"
+              interaction-prompt="none"
               shadow-intensity="0"
               exposure="1"
-              ar
               alt={b.caption ?? `3D object from ${data.title}`}
             ></model-viewer>
             {b.caption && <figcaption>{b.caption}</figcaption>}
@@ -138,6 +141,20 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
       type="module"
       src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js"
     ></script>
+  )}
+  {has3d && (
+    <script is:inline>
+      // Spin starts on load, so reset it the first time each object comes
+      // into view: the visitor always meets it from the front.
+      const seen = new IntersectionObserver((entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          e.target.resetTurntableRotation?.(0);
+          seen.unobserve(e.target);
+        }
+      }, { threshold: 0.4 });
+      document.querySelectorAll('model-viewer').forEach((m) => seen.observe(m));
+    </script>
   )}
 </Base>
 
@@ -183,12 +200,19 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
   .audio .bar { display: block; height: 1px; margin-top: 8px; background: var(--grey-light); }
   .audio .bar span { display: block; height: 100%; width: 0; background: var(--accent); }
 
+  /* full-bleed: break out of the 720px column */
+  .model { width: 100vw; margin-left: calc(50% - 50vw); }
+  .model figcaption { padding: 0 var(--gutter); max-width: 720px; margin-inline: auto; }
   .model model-viewer {
     display: block;
     width: 100%;
-    aspect-ratio: 1;
+    height: min(125vw, 86svh);
     background: transparent;
     --poster-color: transparent;
+  }
+
+  @media (min-width: 720px) {
+    .model model-viewer { height: 90svh; }
   }
 
   .pager {
