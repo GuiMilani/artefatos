@@ -116,6 +116,7 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
               camera-orbit="-20deg 80deg auto"
               rotation-per-second="18deg"
               interaction-prompt="none"
+              disable-zoom
               shadow-intensity="0"
               exposure="1"
               alt={b.caption ?? `3D object from ${data.title}`}
@@ -212,6 +213,9 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
   }
 
   @media (min-width: 720px) {
+    /* back to the text column so the page keeps scrolling around it */
+    .model { width: 100%; margin-left: 0; }
+    .model figcaption { padding: 0; }
     .model model-viewer { height: 90svh; }
   }
 
