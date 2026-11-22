@@ -2,6 +2,7 @@
 import Base from '../layouts/Base.astro';
 import { listArtifacts } from '../lib/artifacts';
 import { coverToAscii } from '../lib/ascii';
+import SpinningSquare from '../components/SpinningSquare.astro';
 
 const list = await listArtifacts();
 const base = import.meta.env.BASE_URL;
@@ -26,7 +27,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
 ---
 <Base title="artefatos">
   <header class="header">
-    <span>artefatos</span>
+    <span class="brand"><SpinningSquare href={base} /><span>artefatos</span></span>
     <span id="counter" aria-live="polite">{pad(1)}/{pad(total)}</span>
   </header>
 
@@ -182,8 +183,10 @@ const pad = (n: number) => String(n).padStart(3, '0');
   function keepCentred() {
     if (copies < 3) return;
     const b = loopBlock();
-    if (window.scrollY < b * 0.5) window.scrollTo(0, window.scrollY + b);
-    else if (window.scrollY > b * 1.5) window.scrollTo(0, window.scrollY - b);
+    const jump = window.scrollY < b * 0.5 ? b : window.scrollY > b * 1.5 ? -b : 0;
+    if (!jump) return;
+    window.dispatchEvent(new CustomEvent('scroll-jump', { detail: jump }));
+    window.scrollTo(0, window.scrollY + jump);
   }
 
   let scheduled = false;
@@ -217,6 +220,9 @@ const pad = (n: number) => String(n).padStart(3, '0');
   window.addEventListener('resize', () => { fit(); onScroll(); });
 
   fit();
-  if (copies >= 3) window.scrollTo(0, loopBlock());
+  if (copies >= 3) {
+    window.dispatchEvent(new CustomEvent('scroll-jump', { detail: loopBlock() }));
+    window.scrollTo(0, loopBlock());
+  }
   activate(rawPosition());
 </script>

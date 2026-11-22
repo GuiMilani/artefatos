@@ -3,6 +3,7 @@ import { Picture } from 'astro:assets';
 import Base from '../../layouts/Base.astro';
 import { listArtifacts, imageOf, fileOf, type Artifact } from '../../lib/artifacts';
 import { coverToAscii } from '../../lib/ascii';
+import SpinningSquare from '../../components/SpinningSquare.astro';
 
 export async function getStaticPaths() {
   const list = await listArtifacts();
@@ -39,7 +40,7 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
 ---
 <Base title={`${data.number} ${data.title} · artefatos`} accent={data.accent}>
   <header class="header">
-    <a href={base}>← artefatos</a>
+    <span class="brand"><SpinningSquare href={base} /><a href={base}>artefatos</a></span>
     <span>{pad(position)}/{pad(total)}</span>
   </header>
 
