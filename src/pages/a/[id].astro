@@ -35,6 +35,7 @@ const ascii = {
   lines: await coverToAscii(data.cover, { charset: data.charset, brightness: data.brightness }),
   seed: data.seed,
   accent: data.accent,
+  charset: data.charset,
 };
 const has3d = data.blocks.some((b) => b.type === 'model3d');
 ---
@@ -84,7 +85,7 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
               <span class="track">{b.title ?? 'som'}</span>
               <span class="time">--:--</span>
             </button>
-            <span class="bar" aria-hidden="true"><span></span></span>
+            <canvas class="meter" tabindex="0" aria-label="position, tap to seek"></canvas>
           </div>
         );
       }
@@ -198,8 +199,8 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
     text-transform: lowercase;
   }
   .audio .state { color: var(--accent); }
-  .audio .bar { display: block; height: 1px; margin-top: 8px; background: var(--grey-light); }
-  .audio .bar span { display: block; height: 100%; width: 0; background: var(--accent); }
+  .audio .meter { display: block; width: 100%; height: 44px; margin-top: 10px; cursor: pointer; touch-action: none; }
+  .audio button:focus-visible, .audio .meter:focus-visible { outline: 1px dashed var(--accent); outline-offset: 3px; }
 
   /* full-bleed: break out of the 720px column */
   .model { width: 100vw; margin-left: calc(50% - 50vw); }
@@ -230,6 +231,7 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
 
 <script>
   import { AsciiCanvas } from '../../lib/ascii-canvas';
+  import { FakeLevel } from '../../lib/fake-level';
 
   const canvas = document.getElementById('ascii') as HTMLCanvasElement;
   const data = JSON.parse(document.getElementById('data')!.textContent!);
@@ -239,27 +241,113 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
   ascii.reveal(data);
   window.addEventListener('resize', fit);
 
-  // Minimal audio player: one tap plays or pauses, one sound at a time.
+  // Audio player: one tap plays or pauses, one sound at a time.
+  // Under each title, a row of ascii columns moves while the sound plays. It is
+  // also the position: played columns in ink, the rest grey, the head in accent.
+  // The playing sound shakes the cover and turns the header square.
+  const COLUMNS = 40;
+  const ROWS = 4;
+  const STACK = ['.', ':', '=', '#'];
+  const INK = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#111';
+  const GREY = getComputedStyle(document.documentElement).getPropertyValue('--grey').trim() || '#a9a9a6';
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   const fmt = (s: number) =>
     Number.isFinite(s) ? `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '--:--';
-  const players = [...document.querySelectorAll<HTMLElement>('[data-audio]')];
-  players.forEach((el) => {
+
+  type Player = { audio: HTMLAudioElement; meter: HTMLCanvasElement; ctx: CanvasRenderingContext2D; level: FakeLevel };
+  const players: Player[] = [...document.querySelectorAll<HTMLElement>('[data-audio]')].map((el, i) => {
     const audio = el.querySelector('audio')!;
     const state = el.querySelector('.state')!;
     const time = el.querySelector('.time')!;
-    const bar = el.querySelector<HTMLElement>('.bar span')!;
+    const meter = el.querySelector<HTMLCanvasElement>('.meter')!;
     audio.addEventListener('loadedmetadata', () => (time.textContent = fmt(audio.duration)));
     audio.addEventListener('timeupdate', () => {
       time.textContent = `${fmt(audio.currentTime)} / ${fmt(audio.duration)}`;
-      bar.style.width = `${(audio.currentTime / audio.duration) * 100 || 0}%`;
     });
     audio.addEventListener('play', () => (state.textContent = '■'));
     audio.addEventListener('pause', () => (state.textContent = '▶'));
     el.querySelector('button')!.addEventListener('click', () => {
       if (audio.paused) {
-        players.forEach((p) => p !== el && p.querySelector('audio')!.pause());
+        players.forEach((p) => p.audio !== audio && p.audio.pause());
         audio.play();
       } else audio.pause();
     });
+
+    const seek = (x: number) => {
+      if (!audio.duration) return;
+      const r = meter.getBoundingClientRect();
+      audio.currentTime = Math.max(0, Math.min(0.999, (x - r.left) / r.width)) * audio.duration;
+    };
+    meter.addEventListener('pointerdown', (e) => {
+      seek(e.clientX);
+      meter.setPointerCapture(e.pointerId);
+    });
+    meter.addEventListener('pointermove', (e) => meter.hasPointerCapture(e.pointerId) && seek(e.clientX));
+    meter.addEventListener('keydown', (e) => {
+      if (!audio.duration) return;
+      if (e.key === 'ArrowRight') audio.currentTime = Math.min(audio.duration - 0.1, audio.currentTime + 5);
+      if (e.key === 'ArrowLeft') audio.currentTime = Math.max(0, audio.currentTime - 5);
+    });
+
+    return { audio, meter, ctx: meter.getContext('2d')!, level: new FakeLevel(COLUMNS, data.seed * 31 + i) };
   });
+
+  const fitMeters = () => {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    for (const p of players) {
+      p.meter.width = Math.floor(p.meter.clientWidth * dpr);
+      p.meter.height = Math.floor(p.meter.clientHeight * dpr);
+      p.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+  };
+
+  const drawMeter = (p: Player) => {
+    const { ctx, meter, audio, level } = p;
+    const w = meter.clientWidth;
+    const h = meter.clientHeight;
+    const cw = w / COLUMNS;
+    const rh = h / ROWS;
+    const head = audio.duration ? Math.floor((audio.currentTime / audio.duration) * COLUMNS) : -1;
+    ctx.clearRect(0, 0, w, h);
+    ctx.font = `bold ${Math.round(rh * 1.15)}px ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace`;
+    ctx.textAlign = 'center';
+    level.columns.forEach((c, i) => {
+      const units = c.v * ROWS * STACK.length; // a quarter-row per glyph step
+      ctx.fillStyle = i === head && level.energy > 0.05 ? data.accent : i < head ? INK : GREY;
+      for (let r = 0; r < ROWS; r++) {
+        const left = units - r * STACK.length;
+        const ch = left >= STACK.length ? STACK[3] : left > 0 ? STACK[Math.ceil(left) - 1] : r === 0 ? '.' : '';
+        if (ch) ctx.fillText(ch, i * cw + cw / 2, h - r * rh - rh * 0.12);
+      }
+    });
+  };
+
+  if (players.length) {
+    fitMeters();
+    window.addEventListener('resize', fitMeters);
+    let last = performance.now();
+    let lastCover = 0;
+    const frame = (now: number) => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      const t = now / 1000;
+      let loudest: Player | null = null;
+      for (const p of players) {
+        p.level.update(t, dt, !p.audio.paused && !reduced);
+        drawMeter(p);
+        if (!loudest || p.level.energy > loudest.level.energy) loudest = p;
+      }
+      const l = loudest!;
+      window.dispatchEvent(new CustomEvent('sound-energy', { detail: l.level.energy * (0.6 + l.level.average()) }));
+      // the cover redraws in steps (~12 fps), like a terminal rather than a video
+      if (now - lastCover > 83) {
+        lastCover = now;
+        const progress = l.audio.duration ? l.audio.currentTime / l.audio.duration : 0;
+        ascii.breathe({ level: l.level, progress, t });
+      }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }
 </script>

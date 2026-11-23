@@ -3,7 +3,13 @@
 // so characters overlap and read as texture rather than text.
 // A single requestAnimationFrame loop draws a batch per frame, in an order shuffled by the seed.
 
-export type AsciiData = { lines: string[]; seed: number; accent: string };
+import { RAMPS } from './ramps';
+import type { FakeLevel } from './fake-level';
+
+export type AsciiData = { lines: string[]; seed: number; accent: string; charset?: string };
+
+/** What a playing sound passes to `breathe`. */
+export type Breath = { level: FakeLevel; progress: number; t: number };
 
 const FONT_RATIO = 1.6;
 const DURATION_MS = 1400;
@@ -27,6 +33,8 @@ export class AsciiCanvas {
   private raf = 0;
   private data: AsciiData | null = null;
   private size = 0;
+  private revealing = false;
+  private breathing = false;
   private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   constructor(private canvas: HTMLCanvasElement, private ink = '#000') {
@@ -61,21 +69,66 @@ export class AsciiCanvas {
     }
 
     let done = 0;
+    this.revealing = true;
     const start = performance.now();
     const step = (now: number) => {
       const target = Math.min(cells.length, Math.ceil(((now - start) / DURATION_MS) * cells.length));
       this.setFont();
       for (; done < target; done++) this.drawCell(cells[done]);
       if (done < cells.length) this.raf = requestAnimationFrame(step);
+      else this.revealing = false;
     };
     this.raf = requestAnimationFrame(step);
+  }
+
+  /**
+   * Redraws the cover shaken by a sound: characters move along the ramp in
+   * proportion to the level of the column above them, most of all in a band
+   * that travels down the image with the track's progress. Passing null puts
+   * the cover back at rest.
+   */
+  breathe(b: Breath | null) {
+    if (!this.data || this.revealing || this.reducedMotion) return;
+    if (!b || b.level.energy < 0.02) {
+      if (this.breathing) this.drawAll();
+      this.breathing = false;
+      return;
+    }
+    this.breathing = true;
+    const d = this.data;
+    const ramp = RAMPS[d.charset ?? 'default'] ?? RAMPS.default;
+    const last = ramp.findIndex((c) => c === ' ') - 1; // darkest-to-lightest, spaces excluded
+    const rows = d.lines.length;
+    const band = b.progress * rows;
+    const avg = b.level.average();
+    const frame = Math.floor(b.t * 9);
+    const energy = b.level.energy;
+
+    this.clear();
+    this.setFont();
+    for (const k of this.cells(d)) {
+      let c = k.c;
+      let accent = k.accent;
+      const near = Math.max(0, 1 - Math.abs(k.y - band) / 10);
+      const push = b.level.at(k.x / d.lines[0].length) * energy * (0.35 + near * 1.6);
+      const h = ((k.x * 73856093) ^ (k.y * 19349663) ^ frame) >>> 0;
+      if ((h % 1000) / 1000 < push * 0.45) {
+        const i = ramp.indexOf(c);
+        if (i >= 0) c = ramp[Math.max(0, Math.min(last, i + ((h >> 10) & 1 ? -2 : 1)))];
+      }
+      if (near > 0.6 && h % 97 < avg * 6 * energy) accent = true;
+      this.drawCell({ ...k, c, accent });
+    }
   }
 
   clear() {
     this.ctx.clearRect(0, 0, this.size, this.size);
   }
 
+  private cache: { d: AsciiData; cells: Cell[] } | null = null;
+
   private cells(d: AsciiData): Cell[] {
+    if (this.cache?.d === d) return this.cache.cells.slice();
     const rnd = mulberry32(d.seed ^ 0x9e3779b9);
     const out: Cell[] = [];
     d.lines.forEach((line, y) => {
@@ -83,7 +136,8 @@ export class AsciiCanvas {
         if (c !== ' ') out.push({ x, y, c, accent: rnd() < ACCENT_SHARE });
       });
     });
-    return out;
+    this.cache = { d, cells: out };
+    return out.slice();
   }
 
   private setFont() {

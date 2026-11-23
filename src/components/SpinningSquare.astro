@@ -41,6 +41,15 @@ const { href, label = 'guilty corisco' } = Astro.props;
     let shown = 0;
     let lastT = performance.now();
 
+    // While a sound plays, the square also turns on its own; scroll still drives it as usual.
+    // Players announce how hard it pushes (0 at rest, about 1 playing) with `sound-energy`.
+    const SOUND_DEG_PER_S = 90;
+    let energy = 0;
+    let spin = 0;
+    window.addEventListener('sound-energy', (e) => {
+      energy = (e as CustomEvent<number>).detail;
+    });
+
     // The index page's infinite loop jumps the scroll position by a whole block;
     // it announces the jump so the square doesn't spin with it.
     window.addEventListener('scroll-jump', (e) => {
@@ -55,7 +64,8 @@ const { href, label = 'guilty corisco' } = Astro.props;
       lastT = t;
       // Exponential catch-up, roughly what GSAP's scrub does.
       shown += (travelled - shown) * (1 - Math.exp(-dt / (SCRUB_SECONDS / 3)));
-      square.style.transform = `rotate(${(shown * DEGREES_PER_PX).toFixed(2)}deg)`;
+      spin += dt * SOUND_DEG_PER_S * energy;
+      square.style.transform = `rotate(${(shown * DEGREES_PER_PX + spin).toFixed(2)}deg)`;
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);

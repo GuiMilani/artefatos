@@ -1,12 +1,9 @@
 import sharp from 'sharp';
 import path from 'node:path';
 
-// Character ramps from dark to light.
-export const RAMPS: Record<string, string[]> = {
-  default: ['@', '#', '$', '=', '*', '!', ';', ':', '~', '-', ',', '.', ' ', ' '],
-  blocks: ['█', '▓', '▒', '░', ':', '.', ' ', ' '],
-  kana: ['ﾎ', 'ﾈ', 'ﾇ', 'ｦ', 'ﾂ', 'ﾐ', 'ｼ', 'ｰ', 'ｨ', '･', ' ', ' '],
-};
+import { RAMPS } from './ramps';
+
+export { RAMPS };
 
 export const COLUMNS = 120;
 
