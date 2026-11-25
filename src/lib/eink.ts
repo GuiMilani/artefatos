@@ -5,8 +5,8 @@
 // inverted, goes black, goes white (with the old page still ghosting
 // through), then a full-screen 1-bit image (the Maria Bonita photo, or a
 // huge grin) refreshes in, band by band, each pixel passing through negative
-// and black before it settles. Then the artifact opens and that image fades
-// softly off it (the arrival is in Base.astro/global.css).
+// and black before it settles. Then the artifact opens under that image,
+// which dissolves pixel by pixel (einkArrive, called from Base.astro).
 
 const INK = [27, 27, 27];
 const PAPER = [230, 230, 225];
@@ -336,4 +336,96 @@ export function installEink() {
     document.querySelectorAll('.eink-layer').forEach((n) => n.remove());
     running = false;
   });
+}
+
+// 8x8 ordered-dither ranks: pixels leave in this pattern, so the image
+// thins out like a halftone instead of turning transparent
+const BAYER8 = (() => {
+  const m = [0];
+  for (let n = 1; n < 8; n *= 2) {
+    const next: number[] = new Array(4 * n * n);
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        const v = m[y * n + x] * 4;
+        next[y * 2 * n + x] = v;
+        next[y * 2 * n + x + n] = v + 2;
+        next[(y + n) * 2 * n + x] = v + 3;
+        next[(y + n) * 2 * n + x + n] = v + 1;
+      }
+    }
+    m.splice(0, m.length, ...next);
+  }
+  return m.map((v) => (v + 0.5) / 64);
+})();
+
+const DISSOLVE = { wait: 180, length: 1200 };
+
+/**
+ * Arrival side: the last frame of the transition sits over the new page
+ * (a CSS layer, so there is no flash before this runs) and dissolves away
+ * pixel by pixel. No transparency, only pixels switching off.
+ */
+export function einkArrive() {
+  const w = window as unknown as { __einkArrival?: { src: string; w: number; h: number } };
+  const arrival = w.__einkArrival;
+  if (!arrival) return;
+  delete w.__einkArrival;
+  const html = document.documentElement;
+  const done = () => html.classList.remove('eink-arrival');
+  if (reduced()) return done();
+
+  const img = new Image();
+  img.onerror = done;
+  img.onload = () => {
+    const cols = img.naturalWidth;
+    const rows = img.naturalHeight;
+    const canvas = document.createElement('canvas');
+    canvas.width = cols;
+    canvas.height = rows;
+    canvas.setAttribute('aria-hidden', 'true');
+    Object.assign(canvas.style, {
+      position: 'fixed', left: '0', top: '0', zIndex: '1001', pointerEvents: 'none',
+      width: `${arrival.w}px`, height: `${arrival.h}px`, imageRendering: 'pixelated',
+    });
+    document.body.appendChild(canvas);
+    const g = canvas.getContext('2d', { willReadFrequently: true })!;
+    g.drawImage(img, 0, 0);
+    const full = g.getImageData(0, 0, cols, rows);
+    const frame = g.createImageData(cols, rows);
+    done();
+
+    // each pixel's turn to leave: the halftone rank, roughened per 4x4 block
+    const seed = (Math.random() * 1e9) | 0;
+    const rank = new Float32Array(cols * rows);
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        rank[y * cols + x] = BAYER8[(y & 7) * 8 + (x & 7)] * 0.7 + hash(seed + (y >> 2) * 7919 + (x >> 2)) * 0.3;
+      }
+    }
+
+    const start = performance.now();
+    const step = (now: number) => {
+      const p = (now - start - DISSOLVE.wait) / DISSOLVE.length;
+      if (p >= 1) {
+        canvas.remove();
+        return;
+      }
+      if (p > 0) {
+        const k = p * p * (3 - 2 * p); // slow start, slow end
+        const a = full.data;
+        const b = frame.data;
+        for (let i = 0; i < rank.length; i++) {
+          const keep = rank[i] >= k;
+          b[i * 4] = a[i * 4];
+          b[i * 4 + 1] = a[i * 4 + 1];
+          b[i * 4 + 2] = a[i * 4 + 2];
+          b[i * 4 + 3] = keep ? a[i * 4 + 3] : 0;
+        }
+        g.putImageData(frame, 0, 0);
+      }
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+  img.src = arrival.src;
 }
