@@ -7,6 +7,7 @@ place: ""
 media: ["3d"]
 accent: "#ff2a2a"
 cover: ./cover.jpg
+special: chao
 seed: 3
 brightness: luma
 blocks:

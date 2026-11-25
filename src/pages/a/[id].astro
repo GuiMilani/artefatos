@@ -131,9 +131,9 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
   </main>
 
   <nav class="pager">
-    <a href={`${base}a/${previous.id}/`}>← {previous.data.number}</a>
+    <a href={`${base}a/${previous.id}/`} data-ink={previous.data.special}>← {previous.data.number}</a>
     <a href={base}>índice</a>
-    <a href={`${base}a/${next.id}/`}>{next.data.number} →</a>
+    <a href={`${base}a/${next.id}/`} data-ink={next.data.special}>{next.data.number} →</a>
   </nav>
 
   <script type="application/json" id="data" set:html={JSON.stringify(ascii)} />
@@ -232,6 +232,9 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
 <script>
   import { AsciiCanvas } from '../../lib/ascii-canvas';
   import { FakeLevel } from '../../lib/fake-level';
+  import { installInk } from '../../lib/ink';
+
+  installInk();
 
   const canvas = document.getElementById('ascii') as HTMLCanvasElement;
   const data = JSON.parse(document.getElementById('data')!.textContent!);

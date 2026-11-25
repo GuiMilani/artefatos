@@ -28,6 +28,13 @@ const artifacts = defineCollection({
       charset: z.enum(['default', 'blocks', 'kana']).default('default'),
       brightness: z.enum(['max', 'luma']).default('max'), // max drops colour, luma keeps it
       draft: z.boolean().default(false),
+      // A special artifact opens through an ink transition. `true` uses the
+      // default mark; or name one: 'death' (cloak from the Dadá/Corisco
+      // collage) or 'chao' (the dark chao stencil). Masks live in /public/ink/.
+      special: z
+        .union([z.literal(true), z.enum(['death', 'chao'])])
+        .optional()
+        .transform((v) => (v === true ? 'death' : v)),
       blocks: z.array(block).default([]),
     }),
 });

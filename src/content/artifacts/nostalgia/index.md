@@ -7,6 +7,7 @@ place: ""
 media: ["foto", "som"]
 accent: "#00a2ff"
 cover: ./photos/img_6358.jpg
+special: death
 seed: 4
 blocks:
   - { type: photo, src: ./photos/img_6359.jpg }
