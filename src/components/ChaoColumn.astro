@@ -25,7 +25,8 @@ const sprites = Array.from({ length: PAIRS * 2 }, (_, i) => (i % 2 === 0 ? 'evil
     position: fixed;
     top: 0;
     bottom: 0;
-    right: 3px;
+    right: 9px;
+    opacity: 0.45;
     width: var(--chao-w);
     overflow: hidden;
     pointer-events: none;
@@ -34,7 +35,7 @@ const sprites = Array.from({ length: PAIRS * 2 }, (_, i) => (i % 2 === 0 ? 'evil
   }
 
   @media (min-width: 720px) {
-    .chao { --chao-w: 30px; --chao-gap: 34px; right: 6px; }
+    .chao { --chao-w: 30px; --chao-gap: 34px; right: 16px; }
   }
 
   .chao-track {
