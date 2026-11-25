@@ -41,7 +41,7 @@ const ascii = {
 };
 const has3d = data.blocks.some((b) => b.type === 'model3d');
 ---
-<Base title={`${data.number} ${data.title} · artefatos`} accent={data.accent}>
+<Base title={`${data.number} ${data.title} · artefatos`} accent={data.accent} chao={data.chao}>
   <header class="header">
     <span class="brand"><SpinningSquare href={base} /><a href={base}>guilty corisco // artefatos</a></span>
     <span>{pad(position)}/{pad(total)}</span>
