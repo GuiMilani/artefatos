@@ -166,9 +166,36 @@ function photo(cols: number, rows: number, img: HTMLImageElement, fx: number, fy
   return out;
 }
 
+/**
+ * A strip of bare paper along the bottom with a tag written on it, laid
+ * over the dithered image in pure 1 bit. Returns the height it took.
+ */
+function caption(out: Uint8Array, cols: number, rows: number, tag: HTMLImageElement) {
+  const band = Math.round(rows * (cols < rows ? 0.26 : 0.3));
+  const y0 = rows - band;
+  out.fill(0, y0 * cols);
+  const c = document.createElement('canvas');
+  c.width = cols;
+  c.height = band;
+  const g = c.getContext('2d', { willReadFrequently: true })!;
+  const scale = Math.min((cols * 0.86) / tag.naturalWidth, (band * 0.9) / tag.naturalHeight);
+  const w = tag.naturalWidth * scale;
+  const h = tag.naturalHeight * scale;
+  g.drawImage(tag, (cols - w) / 2, (band - h) / 2, w, h);
+  const px = g.getImageData(0, 0, cols, band).data;
+  for (let i = 0; i < cols * band; i++) if (px[i * 4] > 60) out[y0 * cols + i] = 1;
+  // a ragged edge where the paper strip meets the photo
+  for (let x = 0; x < cols; x++) {
+    const lift = Math.floor(hash(x * 2654435761) * 2);
+    for (let k = 0; k <= lift; k++) out[(y0 - 1 - k) * cols + x] = 0;
+  }
+  return band;
+}
+
 // The images a special artifact can open with: data-special="<name>".
-const IMAGES: Record<string, { src?: string; fx?: number; fy?: number; cells: number }> = {
-  'maria-bonita': { src: 'eink/maria-bonita.jpg', fx: 0.48, fy: 0.3, cells: 200 }, // focal point: her face
+const IMAGES: Record<string, { src?: string; tag?: string; fx?: number; fy?: number; cells: number }> = {
+  // focal point: her face; the GUILTY tag written underneath
+  'maria-bonita': { src: 'eink/maria-bonita.jpg', tag: 'eink/guilty-tag.png', fx: 0.48, fy: 0.3, cells: 200 },
   grin: { cells: 130 },
 };
 const loaded = new Map<string, Promise<HTMLImageElement>>();
@@ -217,8 +244,12 @@ export async function einkTo(url: string, name = 'maria-bonita') {
 
   const spec = IMAGES[name] ?? IMAGES['maria-bonita'];
   let source: HTMLImageElement | null = null;
+  let tag: HTMLImageElement | null = null;
   if (spec.src) {
     try { source = await load(spec.src); } catch { /* falls back to the grin */ }
+  }
+  if (spec.tag) {
+    try { tag = await load(spec.tag); } catch { /* no caption */ }
   }
 
   const W = window.innerWidth;
@@ -248,7 +279,16 @@ export async function einkTo(url: string, name = 'maria-bonita') {
   const g = canvas.getContext('2d')!;
   const img = g.createImageData(cols, rows);
   const d = img.data;
-  const target = source ? photo(cols, rows, source, spec.fx ?? 0.5, spec.fy ?? 0.5) : grin(cols, rows);
+  let target: Uint8Array;
+  if (source) {
+    // the photo fills what the caption strip leaves
+    const band = tag ? Math.round(rows * (cols < rows ? 0.26 : 0.3)) : 0;
+    target = new Uint8Array(cols * rows);
+    target.set(photo(cols, rows - band, source, spec.fx ?? 0.5, spec.fy ?? 0.5));
+    if (tag) caption(target, cols, rows, tag);
+  } else {
+    target = grin(cols, rows);
+  }
   const seed = (Math.random() * 1e9) | 0;
 
   // when each pixel starts refreshing: a sweep down the screen, broken up
@@ -319,8 +359,8 @@ export function installEink() {
   if (!links.length) return;
   if (!reduced()) {
     for (const a of links) {
-      const src = IMAGES[a.dataset.special!]?.src;
-      if (src) load(src).catch(() => {});
+      const spec = IMAGES[a.dataset.special!];
+      for (const src of [spec?.src, spec?.tag]) if (src) load(src).catch(() => {});
     }
   }
   document.addEventListener('click', (e) => {
