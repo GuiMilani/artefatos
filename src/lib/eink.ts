@@ -398,12 +398,17 @@ const BAYER8 = (() => {
   return m.map((v) => (v + 0.5) / 64);
 })();
 
-const DISSOLVE = { wait: 180, length: 1200 };
+const DISSOLVE = { wait: 300, length: 1200 };
 
 /**
  * Arrival side: the last frame of the transition sits over the new page
  * (a CSS layer, so there is no flash before this runs) and dissolves away
  * pixel by pixel. No transparency, only pixels switching off.
+ *
+ * The dissolve waits for the page to finish loading and to be on screen:
+ * browsers may hold the previous page on screen while the new one loads,
+ * and a clock started too early would play the dissolve where nobody sees
+ * it.
  */
 export function einkArrive() {
   const w = window as unknown as { __einkArrival?: { src: string; w: number; h: number } };
@@ -443,8 +448,9 @@ export function einkArrive() {
       }
     }
 
-    const start = performance.now();
+    let start = -1;
     const step = (now: number) => {
+      if (start < 0) start = now; // the clock starts on the first painted frame
       const p = (now - start - DISSOLVE.wait) / DISSOLVE.length;
       if (p >= 1) {
         canvas.remove();
@@ -465,7 +471,22 @@ export function einkArrive() {
       }
       requestAnimationFrame(step);
     };
-    requestAnimationFrame(step);
+    const begin = () => {
+      if (document.visibilityState === 'hidden') {
+        document.addEventListener('visibilitychange', begin, { once: true });
+        return;
+      }
+      // two frames, so the page under the layer has really been painted
+      requestAnimationFrame(() => requestAnimationFrame(step));
+    };
+    if (document.readyState === 'complete') begin();
+    else {
+      // the page's own photos and audio can be slow: don't wait for ever
+      let started = false;
+      const once = () => { if (!started) { started = true; begin(); } };
+      window.addEventListener('load', once, { once: true });
+      setTimeout(once, 2500);
+    }
   };
   img.src = arrival.src;
 }
