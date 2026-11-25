@@ -273,7 +273,7 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
   // also the position: played columns in ink, the rest grey, the head in accent.
   // The playing sound shakes the cover and turns the header square.
   const COLUMNS = 40;
-  const BAND_SWEEP_S = 22; // one pass of the band down the cover, as in the first prototype's clip
+  const BAND_SWEEP_S = 8; // seconds for one pass of the band down the cover
   const ROWS = 4;
   const STACK = ['.', ':', '=', '#'];
   const INK = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#111';
