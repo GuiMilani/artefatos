@@ -31,7 +31,7 @@ const items = await Promise.all(
 );
 const pad = (n: number) => String(n).padStart(3, '0');
 ---
-<Base title="artefatos">
+<Base title="artefatos" chao={false}>
   <header class="header">
     <span class="brand"><SpinningSquare href={base} /><span>guilty corisco // artefatos</span></span>
     <span id="counter" aria-live="polite">{pad(total)}/{pad(total)}</span>
