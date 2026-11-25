@@ -1,12 +1,14 @@
 ---
 import Base from '../layouts/Base.astro';
-import { listArtifacts } from '../lib/artifacts';
+import { listArtifacts, chronology } from '../lib/artifacts';
+import { en } from '../lib/i18n';
 import { coverToAscii } from '../lib/ascii';
 import SpinningSquare from '../components/SpinningSquare.astro';
 
 const list = await listArtifacts();
 const base = import.meta.env.BASE_URL;
 const total = list.length;
+const order = chronology(list);
 const LOOP_FROM = 8;
 const copies = total >= LOOP_FROM ? 3 : 1;
 const middle = Math.floor(copies / 2);
@@ -17,7 +19,9 @@ const items = await Promise.all(
     url: `${base}a/${id}/`,
     number: data.number,
     title: data.title,
+    position: order.get(id)!,
     info: [data.place, data.period, data.media.join('/')].filter(Boolean).join(' · '),
+    infoEn: [data.place, data.period, data.media.map(en).join('/')].filter(Boolean).join(' · '),
     accent: data.accent,
     seed: data.seed,
     lines: await coverToAscii(data.cover, { charset: data.charset, brightness: data.brightness }),
@@ -28,7 +32,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
 <Base title="artefatos">
   <header class="header">
     <span class="brand"><SpinningSquare href={base} /><span>guilty corisco // artefatos</span></span>
-    <span id="counter" aria-live="polite">{pad(1)}/{pad(total)}</span>
+    <span id="counter" aria-live="polite">{pad(order.get(list[0]?.id) ?? 0)}/{pad(total)}</span>
   </header>
 
   <div class="stage" id="stage">
@@ -103,7 +107,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
   .item a {
     pointer-events: auto;
     display: grid;
-    grid-template-columns: 4.5ch 1fr auto;
+    grid-template-columns: 3.5ch 1fr auto;
     gap: 1ch;
     align-items: center;
     height: 100%;
@@ -143,7 +147,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
   import { AsciiCanvas, type AsciiData } from '../lib/ascii-canvas';
   import { typewrite } from '../lib/typewriter';
 
-  type Item = AsciiData & { id: string; url: string; number: string; title: string; info: string };
+  type Item = AsciiData & { id: string; url: string; number: string; title: string; position: number; info: string; infoEn: string };
 
   const items: Item[] = JSON.parse(document.getElementById('data')!.textContent!);
   const index = document.getElementById('index')!;
@@ -156,6 +160,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
   const copies = Number(index.dataset.copies);
   const ascii = new AsciiCanvas(canvas);
   const pad = (n: number) => String(n).padStart(3, '0');
+  const english = document.documentElement.lang === 'en';
 
   const rowHeight = () => rows[0]?.getBoundingClientRect().height || 26;
   const loopBlock = () => total * rowHeight();
@@ -173,9 +178,9 @@ const pad = (n: number) => String(n).padStart(3, '0');
     active = i;
     const d = items[i];
     document.body.style.setProperty('--accent', d.accent);
-    counter.textContent = `${pad(i + 1)}/${pad(total)}`;
+    counter.textContent = `${pad(d.position)}/${pad(total)}`;
     ascii.reveal(d);
-    typewrite(info, d.info);
+    typewrite(info, english ? d.infoEn : d.info);
   }
 
   // Infinite loop: the list is rendered three times and the scroll position

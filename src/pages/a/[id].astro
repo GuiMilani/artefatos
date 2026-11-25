@@ -1,17 +1,19 @@
 ---
 import { Picture } from 'astro:assets';
 import Base from '../../layouts/Base.astro';
-import { listArtifacts, imageOf, fileOf, type Artifact } from '../../lib/artifacts';
+import { listArtifacts, chronology, imageOf, fileOf, type Artifact } from '../../lib/artifacts';
+import { en } from '../../lib/i18n';
 import { coverToAscii } from '../../lib/ascii';
 import SpinningSquare from '../../components/SpinningSquare.astro';
 
 export async function getStaticPaths() {
   const list = await listArtifacts();
+  const order = chronology(list);
   return list.map((artifact, i) => ({
     params: { id: artifact.id },
     props: {
       artifact,
-      position: i + 1,
+      position: order.get(artifact.id)!,
       total: list.length,
       previous: list[(i - 1 + list.length) % list.length],
       next: list[(i + 1) % list.length],
@@ -52,24 +54,33 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
         <dt class="sr-only">number</dt><dd class="num">{data.number}</dd>
         <dt class="sr-only">title</dt><dd class="title">{data.title}<span class="cursor" aria-hidden="true"></span></dd>
         <dt class="sr-only">place and period</dt><dd>{[data.place, data.period].filter(Boolean).join(' · ')}</dd>
-        <dt class="sr-only">media</dt><dd>{data.media.join(' / ')}</dd>
+        <dt class="sr-only">media</dt><dd data-en={data.media.map(en).join(' / ')}>{data.media.join(' / ')}</dd>
       </dl>
     </section>
 
     {data.blocks.map((b) => {
       if (b.type === 'photo' || b.type === 'scan') {
+        const img = imageOf(id, b.src);
+        // On phones a wide scan is shown turned 90° so it fills the screen's height.
+        const turn = b.type === 'scan' && (b.turn ?? img.width > img.height);
+        const ratio = img.width / img.height;
         return (
-          <figure class:list={['block', b.type, { pixelated: b.type === 'photo' && b.pixelated }]}>
-            <Picture
-              src={imageOf(id, b.src)}
-              formats={['avif', 'webp']}
-              widths={[480, 800, 1200]}
-              sizes="(min-width: 900px) 720px, 100vw"
-              quality={b.type === 'photo' ? 82 : 70}
-              alt={b.caption ?? ''}
-              loading="lazy"
-            />
-            {b.caption && <figcaption>{b.caption}</figcaption>}
+          <figure
+            class:list={['block', b.type, { pixelated: b.type === 'photo' && b.pixelated, turn }]}
+            style={turn ? `--ratio:${ratio.toFixed(4)}` : undefined}
+          >
+            <div class="frame">
+              <Picture
+                src={img}
+                formats={['avif', 'webp']}
+                widths={turn ? [800, 1200, 1800, 2400] : [480, 800, 1200]}
+                sizes={turn ? `(max-width: 719px) ${Math.ceil(ratio * 100)}vw, 720px` : '(min-width: 900px) 720px, 100vw'}
+                quality={b.type === 'photo' ? 82 : 70}
+                alt={b.caption ?? ''}
+                loading="lazy"
+              />
+            </div>
+            {b.caption && <figcaption data-en={en(b.caption)}>{b.caption}</figcaption>}
           </figure>
         );
       }
@@ -82,7 +93,7 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
             <audio src={fileOf(id, b.src)} preload="metadata" loop={b.loop}></audio>
             <button type="button" aria-label={`play ${b.title ?? 'audio'}`}>
               <span class="state">▶</span>
-              <span class="track">{b.title ?? 'som'}</span>
+              {b.title ? <span class="track">{b.title}</span> : <span class="track" data-en={en('som')}>som</span>}
               <span class="time">--:--</span>
             </button>
             <canvas class="meter" tabindex="0" aria-label="position, tap to seek"></canvas>
@@ -122,7 +133,7 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
               exposure="1"
               alt={b.caption ?? `3D object from ${data.title}`}
             ></model-viewer>
-            {b.caption && <figcaption>{b.caption}</figcaption>}
+            {b.caption && <figcaption data-en={en(b.caption)}>{b.caption}</figcaption>}
           </figure>
         );
       }
@@ -132,7 +143,7 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
 
   <nav class="pager">
     <a href={`${base}a/${previous.id}/`}>← {previous.data.number}</a>
-    <a href={base}>índice</a>
+    <a href={base} data-en={en('índice')}>índice</a>
     <a href={`${base}a/${next.id}/`}>{next.data.number} →</a>
   </nav>
 
@@ -183,6 +194,19 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
   .block :global(img), .block video { display: block; width: 100%; height: auto; }
   .scan { background: #fff; padding: 12px; }
   .pixelated :global(img) { image-rendering: pixelated; }
+
+  /* phones: a wide scan turns 90° clockwise and takes the column's full width */
+  @media (max-width: 719px) {
+    .turn .frame { position: relative; aspect-ratio: 1 / var(--ratio); overflow: hidden; }
+    .turn .frame :global(img) {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: calc(100% * var(--ratio));
+      max-width: none;
+      transform: translate(-50%, -50%) rotate(90deg);
+    }
+  }
   figcaption { margin-top: 6px; color: var(--grey); text-transform: lowercase; }
 
   .text { max-width: 42ch; text-transform: lowercase; white-space: pre-line; }
@@ -246,6 +270,7 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
   // also the position: played columns in ink, the rest grey, the head in accent.
   // The playing sound shakes the cover and turns the header square.
   const COLUMNS = 40;
+  const BAND_SWEEP_S = 22; // one pass of the band down the cover, as in the first prototype's clip
   const ROWS = 4;
   const STACK = ['.', ':', '=', '#'];
   const INK = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#111';
@@ -343,7 +368,8 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
       // the cover redraws in steps (~12 fps), like a terminal rather than a video
       if (now - lastCover > 83) {
         lastCover = now;
-        const progress = l.audio.duration ? l.audio.currentTime / l.audio.duration : 0;
+        // the band crosses the cover at the same pace whatever the track's length
+        const progress = (l.audio.currentTime / BAND_SWEEP_S) % 1;
         ascii.breathe({ level: l.level, progress, t });
       }
       requestAnimationFrame(frame);

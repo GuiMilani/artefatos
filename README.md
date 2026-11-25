@@ -25,7 +25,7 @@ npm run build    # outputs the static site to dist/
 
 ```yaml
 ---
-number: "0003"            # catalogue number; the index sorts highest first
+number: "003"             # catalogue number, in order of creation; the index sorts highest first
 title: "cycle name"
 year: "2026"              # shown on the index row
 period: "2025–2026"
@@ -39,7 +39,7 @@ brightness: max           # max (drops colour) | luma
 draft: false              # true hides the artifact
 blocks:
   - { type: photo, src: ./photos/01.jpg, caption: "35mm, hp5", pixelated: false }
-  - { type: scan, src: ./scans/02.jpg }
+  - { type: scan, src: ./scans/02.jpg, turn: true }   # turn: rotate 90° on phones (default: wide scans turn)
   - { type: text, content: "two lines at most" }
   - { type: audio, src: ./audio/track.mp3, title: "track 01", loop: false }
   - { type: video, src: ./video/loop.mp4, poster: ./video/loop.jpg }
@@ -47,7 +47,11 @@ blocks:
 ---
 ```
 
+Blocks appear on the page in the order they are listed.
+
 Visible text on the site (titles, captions, the poem) stays in Portuguese: it is part of the work.
+Media types and short captions follow the visitor's device language (Portuguese by default,
+English otherwise); the translations live in `src/lib/i18n.ts`.
 
 ### Media formats
 

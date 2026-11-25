@@ -6,7 +6,13 @@ export type Artifact = CollectionEntry<'artifacts'>;
 /** Published artifacts, newest (highest number) first. */
 export async function listArtifacts(): Promise<Artifact[]> {
   const all = await getCollection('artifacts', ({ data }) => !data.draft);
-  return all.sort((a, b) => b.data.number.localeCompare(a.data.number));
+  return all.sort((a, b) => Number(b.data.number) - Number(a.data.number));
+}
+
+/** Place of each artifact counted from the first one published (1 = oldest). */
+export function chronology(list: Artifact[]): Map<string, number> {
+  const oldest = [...list].reverse();
+  return new Map(oldest.map((a, i) => [a.id, i + 1]));
 }
 
 const images = import.meta.glob<{ default: ImageMetadata }>(
