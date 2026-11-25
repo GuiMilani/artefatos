@@ -27,7 +27,7 @@ export class FakeLevel {
     const rnd = mulberry32(seed);
     this.columns = Array.from({ length: count }, () => ({
       peak: FLOOR + rnd() * (1 - FLOOR),
-      period: 0.5 + rnd() * 0.25, // seconds per swing, never shared
+      period: 0.42 + rnd() * 0.22, // seconds per swing, never shared
       phase: rnd(),
       v: 0,
     }));

@@ -9,6 +9,7 @@ accent: "#ff2a2a"
 cover: ./cover.jpg
 seed: 3
 brightness: luma
+chao: true
 blocks:
   - { type: model3d, src: ./3d/maneki-neko.glb, poster: ./3d/poster.webp, caption: "bem vindo" }
 ---
