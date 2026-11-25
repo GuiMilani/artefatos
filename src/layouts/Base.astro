@@ -39,18 +39,22 @@ const ogImage = new URL(`${import.meta.env.BASE_URL}og.jpg`, Astro.site).href;
           window.__einkArrival = arrival;
         }
       } catch (e) {}
-      // Arriving through the plain page flash (src/lib/flash.ts): open in
-      // negative (global.css) and snap back a beat after the first paint.
+      // Arriving through the plain page flash (src/lib/flash.ts), or through
+      // the browser's back/forward buttons or a refresh: open in negative (global.css)
+      // and snap back a beat after the first paint.
+      window.__flashIn = () => {
+        const html = document.documentElement;
+        if (html.classList.contains('eink-arrival')) return;
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        html.classList.add('flash-arrival');
+        requestAnimationFrame(() => requestAnimationFrame(() =>
+          setTimeout(() => html.classList.remove('flash-arrival'), 70)));
+      };
       try {
-        if (sessionStorage.getItem('flash-arrival')) {
-          sessionStorage.removeItem('flash-arrival');
-          const html = document.documentElement;
-          if (!html.classList.contains('eink-arrival')) {
-            html.classList.add('flash-arrival');
-            requestAnimationFrame(() => requestAnimationFrame(() =>
-              setTimeout(() => html.classList.remove('flash-arrival'), 70)));
-          }
-        }
+        const nav = performance.getEntriesByType('navigation')[0];
+        const flagged = sessionStorage.getItem('flash-arrival');
+        sessionStorage.removeItem('flash-arrival');
+        if (flagged || (nav && (nav.type === 'back_forward' || nav.type === 'reload'))) window.__flashIn();
       } catch (e) {}
     </script>
   </head>

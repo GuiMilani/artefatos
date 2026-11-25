@@ -4,7 +4,7 @@
 // screen dropping to negative for a beat, like an e-reader turning a page.
 // The leaving page inverts and stays inverted until the browser swaps it;
 // the arriving page opens in negative and snaps back (global.css,
-// html.flash-arrival). Special artifacts keep their own transition.
+// html.flash-arrival), also when it is reached with back/forward. Special artifacts keep their own transition.
 
 const HOLD = 90; // ms the leaving page sits in negative before navigating
 
@@ -44,11 +44,21 @@ export function installFlash() {
     e.preventDefault();
     flashTo(a.href);
   });
-  // Back button restores the page as it was left, still inverted: undo it.
+  // Leaving by the browser's own buttons (back, forward, refresh): no time
+  // to hold, but the page goes negative while the browser takes over.
+  window.addEventListener('beforeunload', () => {
+    if (leaving || reduced()) return;
+    const layer = document.createElement('div');
+    layer.className = 'flash-layer';
+    layer.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(layer);
+  });
+  // Back/forward can restore the page from memory, as it was left (maybe
+  // still inverted): drop the leaving layer and flash in like any arrival.
   window.addEventListener('pageshow', (e) => {
     if (!e.persisted) return;
     document.querySelectorAll('.flash-layer').forEach((n) => n.remove());
-    document.documentElement.classList.remove('flash-arrival');
     leaving = false;
+    (window as unknown as { __flashIn?: () => void }).__flashIn?.();
   });
 }
