@@ -7,6 +7,7 @@ place: ""
 media: ["foto", "som"]
 accent: "#00a2ff"
 cover: ./photos/img_6358.jpg
+special: true
 seed: 4
 blocks:
   - { type: audio, src: ./audio/nostalgia.m4a, loop: true }

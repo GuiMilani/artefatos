@@ -30,6 +30,12 @@ const artifacts = defineCollection({
       charset: z.enum(['default', 'blocks', 'kana']).default('default'),
       brightness: z.enum(['max', 'luma']).default('max'), // max drops colour, luma keeps it
       draft: z.boolean().default(false),
+      // Opens through the e-ink transition (src/lib/eink.ts), showing an image:
+      // true = the Maria Bonita photo, or name it: 'maria-bonita' | 'grin'.
+      special: z
+        .union([z.boolean(), z.enum(['maria-bonita', 'grin'])])
+        .default(false)
+        .transform((v) => (v === true ? 'maria-bonita' : v || undefined)),
       blocks: z.array(block).default([]),
     }),
 });

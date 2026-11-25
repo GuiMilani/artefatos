@@ -26,6 +26,7 @@ const items = await Promise.all(
     infoEn: [data.place, data.period, data.media.map(en).join('/')].filter(Boolean).join(' · '),
     accent: data.accent,
     seed: data.seed,
+    special: data.special,
     lines: await coverToAscii(data.cover, { charset: data.charset, brightness: data.brightness }),
   })),
 );
@@ -46,7 +47,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
       {Array.from({ length: copies }).flatMap((_, c) =>
         list.map(({ id, data }, i) => (
           <li class="item" data-i={i} aria-hidden={c !== middle ? 'true' : undefined}>
-            <a href={`${base}a/${id}/`} tabindex={c !== middle ? -1 : undefined}>
+            <a href={`${base}a/${id}/`} data-special={data.special} tabindex={c !== middle ? -1 : undefined}>
               <span class="num">{data.number}</span>
               <span class="name">{data.title}<span class="cursor" aria-hidden="true"></span></span>
               <span class="year">{data.year}</span>
@@ -148,8 +149,9 @@ const pad = (n: number) => String(n).padStart(3, '0');
 <script>
   import { AsciiCanvas, type AsciiData } from '../lib/ascii-canvas';
   import { typewrite } from '../lib/typewriter';
+  import { einkTo, installEink } from '../lib/eink';
 
-  type Item = AsciiData & { id: string; url: string; number: string; title: string; position: number; info: string; infoEn: string };
+  type Item = AsciiData & { id: string; url: string; number: string; title: string; position: number; info: string; infoEn: string; special?: string };
 
   const items: Item[] = JSON.parse(document.getElementById('data')!.textContent!);
   const index = document.getElementById('index')!;
@@ -220,8 +222,12 @@ const pad = (n: number) => String(n).padStart(3, '0');
     window.scrollTo({ top: rows.indexOf(li) * rowHeight(), behavior: 'smooth' });
   });
   canvas.addEventListener('click', () => {
-    if (active >= 0) window.location.href = items[active].url;
+    if (active < 0) return;
+    const d = items[active];
+    if (d.special) einkTo(d.url, d.special);
+    else window.location.href = d.url;
   });
+  installEink();
 
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', () => { fit(); onScroll(); });

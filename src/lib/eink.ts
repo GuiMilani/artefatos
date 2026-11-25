@@ -1,0 +1,471 @@
+// E-ink transition for "special" artifacts.
+//
+// Tapping a link with data-special doesn't navigate straight away: the
+// screen behaves like an e-reader waking from sleep. The page flashes
+// inverted, goes black, goes white (with the old page still ghosting
+// through), then a full-screen 1-bit image (the Maria Bonita photo, or a
+// huge grin) refreshes in, band by band, each pixel passing through negative
+// and black before it settles. Then the artifact opens under that image,
+// which dissolves pixel by pixel (einkArrive, called from Base.astro).
+
+const INK = [27, 27, 27];
+const PAPER = [230, 230, 225];
+
+// ms from the tap
+const T = {
+  invert: 0,      // page shown in negative
+  black: 110,     // full black
+  white: 230,     // white, old page ghosting through
+  draw: 340,      // band refresh of the grin starts
+  sweep: 520,     // time for the refresh to travel top to bottom
+  pixel: 240,     // one pixel's negative -> black -> image
+  glitch: 1450,   // a few blocks flicker while it holds
+  end: 1950,      // navigate
+};
+
+// 4x4 ordered dither, the classic e-ink greyscale
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+
+/** The grin, drawn at grid resolution and dithered to 1 bit (1 = ink). */
+function grin(cols: number, rows: number): Uint8Array {
+  const c = document.createElement('canvas');
+  c.width = cols;
+  c.height = rows;
+  const g = c.getContext('2d', { willReadFrequently: true })!;
+  g.fillStyle = '#fff';
+  g.fillRect(0, 0, cols, rows);
+
+  // The mouth is a crescent in a box that fills the screen: as wide as a
+  // phone (a little wider), and on a tall screen it opens into a huge maw.
+  const bw = Math.min(cols * 1.06, rows * 1.7);
+  const bh = Math.min(rows * 0.66, bw * 1.05);
+  const left = (cols - bw) / 2;
+  const boxTop = rows / 2 - bh * 0.56;
+  const s = bh; // line weights and blur
+  const X = (u: number) => left + ((u + 1) / 2) * bw;
+  const top = (u: number) => boxTop + bh * (0.04 + 0.42 * (1 - u * u));
+  const bot = (u: number) => boxTop + bh * (0.04 + 0.96 * Math.pow(Math.max(0, 1 - u * u), 0.55));
+  const open = (u: number) => bot(u) - top(u);
+  const N = 80;
+
+  const mouth = new Path2D();
+  for (let i = 0; i <= N; i++) {
+    const u = -1 + (2 * i) / N;
+    i ? mouth.lineTo(X(u), top(u)) : mouth.moveTo(X(u), top(u));
+  }
+  for (let i = N; i >= 0; i--) {
+    const u = -1 + (2 * i) / N;
+    mouth.lineTo(X(u), bot(u));
+  }
+  mouth.closePath();
+
+  // faint dithered halo, like ink bled into the paper
+  g.save();
+  g.filter = `blur(${Math.max(1.5, s * 0.025)}px)`;
+  g.fillStyle = 'rgba(0,0,0,0.3)';
+  g.fill(mouth);
+  g.restore();
+
+  g.fillStyle = '#000';
+  g.fill(mouth);
+
+  // teeth: sharp, interlocking, top row bites down, bottom row bites up
+  const tooth = (u0: number, u1: number, down: boolean) => {
+    const um = (u0 + u1) / 2;
+    const gap = (u1 - u0) * 0.14;
+    const a = u0 + gap;
+    const b = u1 - gap;
+    const edge = down ? top : bot;
+    const depth = open(um) * (down ? 0.5 : 0.38) * (down ? 1 : -1);
+    const p = new Path2D();
+    p.moveTo(X(a), edge(a) + (down ? 1 : -1));
+    p.lineTo(X(b), edge(b) + (down ? 1 : -1));
+    p.lineTo(X(um), edge(um) + depth);
+    p.closePath();
+    // white at the gum, greying towards the tip
+    const grad = g.createLinearGradient(0, edge(um), 0, edge(um) + depth);
+    grad.addColorStop(0, '#fff');
+    grad.addColorStop(0.55, '#f2f2f2');
+    grad.addColorStop(1, '#8a8a8a');
+    g.fillStyle = grad;
+    g.fill(p);
+  };
+  const upper = 9;
+  for (let i = 0; i < upper; i++) {
+    const u0 = -0.9 + (1.8 * i) / upper;
+    tooth(u0, u0 + 1.8 / upper, true);
+  }
+  const lower = 8;
+  for (let i = 0; i < lower; i++) {
+    const u0 = -0.83 + (1.66 * i) / lower;
+    tooth(u0, u0 + 1.66 / lower, false);
+  }
+
+  // lip line and the creases at the corners
+  g.lineWidth = Math.max(1.5, s * 0.03);
+  g.lineCap = 'round';
+  g.strokeStyle = '#000';
+  g.stroke(mouth);
+  for (const side of [-1, 1]) {
+    // a short crease curling up past each corner
+    const x = X(side);
+    const y = top(1);
+    g.beginPath();
+    g.moveTo(x - side * bw * 0.015, y + bh * 0.06);
+    g.quadraticCurveTo(x + side * bw * 0.03, y + bh * 0.02, x + side * bw * 0.02, y - bh * 0.07);
+    g.stroke();
+  }
+
+  const px = g.getImageData(0, 0, cols, rows).data;
+  const out = new Uint8Array(cols * rows);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const i = y * cols + x;
+      const darkness = 1 - px[i * 4] / 255;
+      out[i] = darkness > BAYER[(y & 3) * 4 + (x & 3)] ? 1 : 0;
+    }
+  }
+  return out;
+}
+
+/**
+ * A photo, cropped to cover the screen around a focal point and dithered to
+ * 1 bit with Atkinson's error diffusion (the old Mac look; it keeps the
+ * highlights open, like e-paper).
+ */
+function photo(cols: number, rows: number, img: HTMLImageElement, fx: number, fy: number): Uint8Array {
+  const c = document.createElement('canvas');
+  c.width = cols;
+  c.height = rows;
+  const g = c.getContext('2d', { willReadFrequently: true })!;
+  const scale = Math.max(cols / img.naturalWidth, rows / img.naturalHeight);
+  const w = img.naturalWidth * scale;
+  const h = img.naturalHeight * scale;
+  const x = Math.min(0, Math.max(cols - w, cols / 2 - fx * w));
+  const y = Math.min(0, Math.max(rows - h, rows / 2 - fy * h));
+  g.filter = 'grayscale(1) contrast(1.15)';
+  g.drawImage(img, x, y, w, h);
+  const px = g.getImageData(0, 0, cols, rows).data;
+  const v = new Float32Array(cols * rows);
+  for (let i = 0; i < v.length; i++) v[i] = px[i * 4] / 255;
+  const out = new Uint8Array(cols * rows);
+  const spread = [[1, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [0, 2]];
+  for (let yy = 0; yy < rows; yy++) {
+    for (let xx = 0; xx < cols; xx++) {
+      const i = yy * cols + xx;
+      const ink = v[i] < 0.5;
+      out[i] = ink ? 1 : 0;
+      const err = (v[i] - (ink ? 0 : 1)) / 8;
+      for (const [dx, dy] of spread) {
+        const nx = xx + dx;
+        const ny = yy + dy;
+        if (nx >= 0 && nx < cols && ny < rows) v[ny * cols + nx] += err;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * A strip of bare paper along the bottom with a tag written on it, laid
+ * over the dithered image in pure 1 bit. Returns the height it took.
+ */
+function caption(out: Uint8Array, cols: number, rows: number, tag: HTMLImageElement) {
+  const band = Math.round(rows * (cols < rows ? 0.26 : 0.3));
+  const y0 = rows - band;
+  out.fill(0, y0 * cols);
+  const c = document.createElement('canvas');
+  c.width = cols;
+  c.height = band;
+  const g = c.getContext('2d', { willReadFrequently: true })!;
+  const scale = Math.min((cols * 0.86) / tag.naturalWidth, (band * 0.9) / tag.naturalHeight);
+  const w = tag.naturalWidth * scale;
+  const h = tag.naturalHeight * scale;
+  g.drawImage(tag, (cols - w) / 2, (band - h) / 2, w, h);
+  const px = g.getImageData(0, 0, cols, band).data;
+  for (let i = 0; i < cols * band; i++) if (px[i * 4] > 60) out[y0 * cols + i] = 1;
+  // a ragged edge where the paper strip meets the photo
+  for (let x = 0; x < cols; x++) {
+    const lift = Math.floor(hash(x * 2654435761) * 2);
+    for (let k = 0; k <= lift; k++) out[(y0 - 1 - k) * cols + x] = 0;
+  }
+  return band;
+}
+
+// The images a special artifact can open with: data-special="<name>".
+const IMAGES: Record<string, { src?: string; tag?: string; fx?: number; fy?: number; cells: number }> = {
+  // focal point: her face; the GUILTY tag written underneath
+  'maria-bonita': { src: 'eink/maria-bonita.jpg', tag: 'eink/guilty-tag.png', fx: 0.48, fy: 0.3, cells: 200 },
+  grin: { cells: 130 },
+};
+const loaded = new Map<string, Promise<HTMLImageElement>>();
+function load(src: string) {
+  let p = loaded.get(src);
+  if (!p) {
+    p = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = import.meta.env.BASE_URL + src;
+    });
+    loaded.set(src, p);
+  }
+  return p;
+}
+
+function hash(n: number) {
+  n = Math.imul(n ^ (n >>> 15), 0x2c1b3c6d);
+  n = Math.imul(n ^ (n >>> 12), 0x297a2d39);
+  return ((n ^ (n >>> 15)) >>> 0) / 4294967296;
+}
+
+const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let running = false;
+
+/** Hand the last image to the next page, which fades it off (Base.astro). */
+function go(url: string, canvas: HTMLCanvasElement, w: number, h: number) {
+  try {
+    sessionStorage.setItem('eink-arrival', JSON.stringify({ src: canvas.toDataURL('image/png'), w, h }));
+  } catch { /* private mode: plain arrival */ }
+  window.location.href = url;
+}
+
+export async function einkTo(url: string, name = 'maria-bonita') {
+  if (running) return;
+  if (reduced()) {
+    window.location.href = url;
+    return;
+  }
+  running = true;
+  const link = document.createElement('link');
+  link.rel = 'prefetch';
+  link.href = url;
+  document.head.appendChild(link);
+
+  const spec = IMAGES[name] ?? IMAGES['maria-bonita'];
+  let source: HTMLImageElement | null = null;
+  let tag: HTMLImageElement | null = null;
+  if (spec.src) {
+    try { source = await load(spec.src); } catch { /* falls back to the grin */ }
+  }
+  if (spec.tag) {
+    try { tag = await load(spec.tag); } catch { /* no caption */ }
+  }
+
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  // a photo needs finer pixels than the grin to keep a face
+  const cell = Math.max(source ? 2 : 3, Math.round(Math.min(W, H) / (source ? spec.cells : 130)));
+  const cols = Math.ceil(W / cell);
+  const rows = Math.ceil(H / cell);
+
+  const layer = document.createElement('div');
+  layer.className = 'eink-layer';
+  layer.setAttribute('aria-hidden', 'true');
+  Object.assign(layer.style, {
+    position: 'fixed', inset: '0', zIndex: '1000', pointerEvents: 'auto',
+    backdropFilter: 'invert(1) grayscale(1)', webkitBackdropFilter: 'invert(1) grayscale(1)',
+  });
+  const canvas = document.createElement('canvas');
+  canvas.width = cols;
+  canvas.height = rows;
+  Object.assign(canvas.style, {
+    position: 'absolute', left: '0', top: '0',
+    width: `${cols * cell}px`, height: `${rows * cell}px`, imageRendering: 'pixelated',
+  });
+  layer.appendChild(canvas);
+  document.body.appendChild(layer);
+
+  const g = canvas.getContext('2d')!;
+  const img = g.createImageData(cols, rows);
+  const d = img.data;
+  let target: Uint8Array;
+  if (source) {
+    // the photo fills what the caption strip leaves
+    const band = tag ? Math.round(rows * (cols < rows ? 0.26 : 0.3)) : 0;
+    target = new Uint8Array(cols * rows);
+    target.set(photo(cols, rows - band, source, spec.fx ?? 0.5, spec.fy ?? 0.5));
+    if (tag) caption(target, cols, rows, tag);
+  } else {
+    target = grin(cols, rows);
+  }
+  const seed = (Math.random() * 1e9) | 0;
+
+  // when each pixel starts refreshing: a sweep down the screen, broken up
+  // into 8x8 blocks that lag a little, like a partial-refresh waveform
+  const delay = new Float32Array(cols * rows);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const block = hash(seed + (y >> 3) * 977 + (x >> 3));
+      delay[y * cols + x] = (y / rows) * T.sweep + block * 130 + hash(seed ^ (y * 131 + x)) * 18;
+    }
+  }
+
+  const put = (i: number, ink: boolean, alpha = 255) => {
+    const c = ink ? INK : PAPER;
+    d[i * 4] = c[0]; d[i * 4 + 1] = c[1]; d[i * 4 + 2] = c[2]; d[i * 4 + 3] = alpha;
+  };
+  const fill = (ink: boolean, alpha = 255) => { for (let i = 0; i < cols * rows; i++) put(i, ink, alpha); };
+
+  const slow = (window as unknown as { __einkSlow?: number }).__einkSlow ?? 1;
+  const start = performance.now();
+  let glitch: Set<number> | null = null;
+
+  const frame = (now: number) => {
+    const t = (now - start) / slow;
+
+    if (t < T.black) {
+      // the page itself in negative (backdrop filter), nothing drawn yet
+    } else if (t < T.white) {
+      layer.style.backdropFilter = layer.style.webkitBackdropFilter = 'grayscale(1)';
+      fill(true);
+    } else if (t < T.draw) {
+      fill(false, 232); // translucent white: the old page ghosts through
+    } else {
+      if (t > T.glitch && t < T.glitch + 70 && !glitch) {
+        glitch = new Set();
+        for (let k = 0; k < 6; k++) glitch.add(Math.floor(hash(seed + k * 7919) * (cols >> 3) * (rows >> 3)));
+      }
+      if (t >= T.glitch + 70) glitch = null;
+      const bcols = cols >> 3;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = y * cols + x;
+          const lt = t - T.draw - delay[i];
+          const on = target[i] === 1;
+          if (lt < 0) put(i, false, 232 + Math.min(23, (t - T.draw) / 30));
+          else if (lt < T.pixel / 3) put(i, !on);        // negative
+          else if (lt < (2 * T.pixel) / 3) put(i, true); // black
+          else if (glitch && glitch.has((y >> 3) * bcols + (x >> 3))) put(i, !on);
+          else put(i, on);
+        }
+      }
+    }
+    g.putImageData(img, 0, 0);
+
+    if (t < T.end) requestAnimationFrame(frame);
+    else go(url, canvas, cols * cell, rows * cell);
+  };
+  requestAnimationFrame(frame);
+}
+
+/**
+ * Any <a data-special> on the page runs the transition. Handlers that
+ * already took the click (preventDefault) win, e.g. the index scrolling an
+ * inactive row to the reading line.
+ */
+export function installEink() {
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('a[data-special]')];
+  if (!links.length) return;
+  if (!reduced()) {
+    for (const a of links) {
+      const spec = IMAGES[a.dataset.special!];
+      for (const src of [spec?.src, spec?.tag]) if (src) load(src).catch(() => {});
+    }
+  }
+  document.addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[data-special]');
+    if (!a) return;
+    e.preventDefault();
+    einkTo(a.href, a.dataset.special);
+  });
+  // Back button restores this page as it was left, under the layer: drop it.
+  window.addEventListener('pageshow', (e) => {
+    if (!e.persisted) return;
+    document.querySelectorAll('.eink-layer').forEach((n) => n.remove());
+    running = false;
+  });
+}
+
+// 8x8 ordered-dither ranks: pixels leave in this pattern, so the image
+// thins out like a halftone instead of turning transparent
+const BAYER8 = (() => {
+  const m = [0];
+  for (let n = 1; n < 8; n *= 2) {
+    const next: number[] = new Array(4 * n * n);
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        const v = m[y * n + x] * 4;
+        next[y * 2 * n + x] = v;
+        next[y * 2 * n + x + n] = v + 2;
+        next[(y + n) * 2 * n + x] = v + 3;
+        next[(y + n) * 2 * n + x + n] = v + 1;
+      }
+    }
+    m.splice(0, m.length, ...next);
+  }
+  return m.map((v) => (v + 0.5) / 64);
+})();
+
+const DISSOLVE = { wait: 180, length: 1200 };
+
+/**
+ * Arrival side: the last frame of the transition sits over the new page
+ * (a CSS layer, so there is no flash before this runs) and dissolves away
+ * pixel by pixel. No transparency, only pixels switching off.
+ */
+export function einkArrive() {
+  const w = window as unknown as { __einkArrival?: { src: string; w: number; h: number } };
+  const arrival = w.__einkArrival;
+  if (!arrival) return;
+  delete w.__einkArrival;
+  const html = document.documentElement;
+  const done = () => html.classList.remove('eink-arrival');
+  if (reduced()) return done();
+
+  const img = new Image();
+  img.onerror = done;
+  img.onload = () => {
+    const cols = img.naturalWidth;
+    const rows = img.naturalHeight;
+    const canvas = document.createElement('canvas');
+    canvas.width = cols;
+    canvas.height = rows;
+    canvas.setAttribute('aria-hidden', 'true');
+    Object.assign(canvas.style, {
+      position: 'fixed', left: '0', top: '0', zIndex: '1001', pointerEvents: 'none',
+      width: `${arrival.w}px`, height: `${arrival.h}px`, imageRendering: 'pixelated',
+    });
+    document.body.appendChild(canvas);
+    const g = canvas.getContext('2d', { willReadFrequently: true })!;
+    g.drawImage(img, 0, 0);
+    const full = g.getImageData(0, 0, cols, rows);
+    const frame = g.createImageData(cols, rows);
+    done();
+
+    // each pixel's turn to leave: the halftone rank, roughened per 4x4 block
+    const seed = (Math.random() * 1e9) | 0;
+    const rank = new Float32Array(cols * rows);
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        rank[y * cols + x] = BAYER8[(y & 7) * 8 + (x & 7)] * 0.7 + hash(seed + (y >> 2) * 7919 + (x >> 2)) * 0.3;
+      }
+    }
+
+    const start = performance.now();
+    const step = (now: number) => {
+      const p = (now - start - DISSOLVE.wait) / DISSOLVE.length;
+      if (p >= 1) {
+        canvas.remove();
+        return;
+      }
+      if (p > 0) {
+        const k = p * p * (3 - 2 * p); // slow start, slow end
+        const a = full.data;
+        const b = frame.data;
+        for (let i = 0; i < rank.length; i++) {
+          const keep = rank[i] >= k;
+          b[i * 4] = a[i * 4];
+          b[i * 4 + 1] = a[i * 4 + 1];
+          b[i * 4 + 2] = a[i * 4 + 2];
+          b[i * 4 + 3] = keep ? a[i * 4 + 3] : 0;
+        }
+        g.putImageData(frame, 0, 0);
+      }
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+  img.src = arrival.src;
+}
