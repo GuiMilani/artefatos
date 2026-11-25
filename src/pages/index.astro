@@ -150,6 +150,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
   import { AsciiCanvas, type AsciiData } from '../lib/ascii-canvas';
   import { typewrite } from '../lib/typewriter';
   import { einkTo, installEink } from '../lib/eink';
+  import { flashTo } from '../lib/flash';
 
   type Item = AsciiData & { id: string; url: string; number: string; title: string; position: number; info: string; infoEn: string; special?: string };
 
@@ -225,7 +226,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
     if (active < 0) return;
     const d = items[active];
     if (d.special) einkTo(d.url, d.special);
-    else window.location.href = d.url;
+    else flashTo(d.url);
   });
   installEink();
 

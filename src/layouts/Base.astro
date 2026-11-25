@@ -39,6 +39,19 @@ const ogImage = new URL(`${import.meta.env.BASE_URL}og.jpg`, Astro.site).href;
           window.__einkArrival = arrival;
         }
       } catch (e) {}
+      // Arriving through the plain page flash (src/lib/flash.ts): open in
+      // negative (global.css) and snap back a beat after the first paint.
+      try {
+        if (sessionStorage.getItem('flash-arrival')) {
+          sessionStorage.removeItem('flash-arrival');
+          const html = document.documentElement;
+          if (!html.classList.contains('eink-arrival')) {
+            html.classList.add('flash-arrival');
+            requestAnimationFrame(() => requestAnimationFrame(() =>
+              setTimeout(() => html.classList.remove('flash-arrival'), 70)));
+          }
+        }
+      } catch (e) {}
     </script>
   </head>
   <body style={accent ? `--accent:${accent}` : undefined}>
@@ -56,7 +69,9 @@ const ogImage = new URL(`${import.meta.env.BASE_URL}og.jpg`, Astro.site).href;
     </script>
     <script>
       import { einkArrive } from '../lib/eink';
+      import { installFlash } from '../lib/flash';
       einkArrive();
+      installFlash();
     </script>
   </body>
 </html>

@@ -79,3 +79,20 @@ html.eink-arrival body::after {
 @media (prefers-reduced-motion: reduce) {
   html.eink-arrival body::after { display: none; }
 }
+
+/* Page flash (see src/lib/flash.ts): every internal navigation drops the
+   screen to negative for a beat, like an e-reader refresh. */
+.flash-layer,
+html.flash-arrival body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  pointer-events: none;
+  backdrop-filter: invert(1) grayscale(1);
+  -webkit-backdrop-filter: invert(1) grayscale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.flash-arrival body::before { display: none; }
+}
