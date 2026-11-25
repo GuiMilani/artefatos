@@ -3,9 +3,10 @@
 // Tapping a link with data-special doesn't navigate straight away: the
 // screen behaves like an e-reader waking from sleep. The page flashes
 // inverted, goes black, goes white (with the old page still ghosting
-// through), then a huge 1-bit grin refreshes in, band by band, each pixel
-// passing through negative and black before it settles. A last full
-// refresh and the artifact opens (its arrival is in Base.astro/global.css).
+// through), then a full-screen 1-bit image (the Maria Bonita photo, or a
+// huge grin) refreshes in, band by band, each pixel passing through negative
+// and black before it settles. Then the artifact opens and that image fades
+// softly off it (the arrival is in Base.astro/global.css).
 
 const INK = [27, 27, 27];
 const PAPER = [230, 230, 225];
@@ -19,9 +20,7 @@ const T = {
   sweep: 520,     // time for the refresh to travel top to bottom
   pixel: 240,     // one pixel's negative -> black -> image
   glitch: 1450,   // a few blocks flicker while it holds
-  out: 1900,      // full refresh: grin in negative
-  outBlack: 2010, // black, then navigate
-  end: 2130,
+  end: 1950,      // navigate
 };
 
 // 4x4 ordered dither, the classic e-ink greyscale
@@ -129,6 +128,64 @@ function grin(cols: number, rows: number): Uint8Array {
   return out;
 }
 
+/**
+ * A photo, cropped to cover the screen around a focal point and dithered to
+ * 1 bit with Atkinson's error diffusion (the old Mac look; it keeps the
+ * highlights open, like e-paper).
+ */
+function photo(cols: number, rows: number, img: HTMLImageElement, fx: number, fy: number): Uint8Array {
+  const c = document.createElement('canvas');
+  c.width = cols;
+  c.height = rows;
+  const g = c.getContext('2d', { willReadFrequently: true })!;
+  const scale = Math.max(cols / img.naturalWidth, rows / img.naturalHeight);
+  const w = img.naturalWidth * scale;
+  const h = img.naturalHeight * scale;
+  const x = Math.min(0, Math.max(cols - w, cols / 2 - fx * w));
+  const y = Math.min(0, Math.max(rows - h, rows / 2 - fy * h));
+  g.filter = 'grayscale(1) contrast(1.15)';
+  g.drawImage(img, x, y, w, h);
+  const px = g.getImageData(0, 0, cols, rows).data;
+  const v = new Float32Array(cols * rows);
+  for (let i = 0; i < v.length; i++) v[i] = px[i * 4] / 255;
+  const out = new Uint8Array(cols * rows);
+  const spread = [[1, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [0, 2]];
+  for (let yy = 0; yy < rows; yy++) {
+    for (let xx = 0; xx < cols; xx++) {
+      const i = yy * cols + xx;
+      const ink = v[i] < 0.5;
+      out[i] = ink ? 1 : 0;
+      const err = (v[i] - (ink ? 0 : 1)) / 8;
+      for (const [dx, dy] of spread) {
+        const nx = xx + dx;
+        const ny = yy + dy;
+        if (nx >= 0 && nx < cols && ny < rows) v[ny * cols + nx] += err;
+      }
+    }
+  }
+  return out;
+}
+
+// The images a special artifact can open with: data-special="<name>".
+const IMAGES: Record<string, { src?: string; fx?: number; fy?: number; cells: number }> = {
+  'maria-bonita': { src: 'eink/maria-bonita.jpg', fx: 0.48, fy: 0.3, cells: 200 }, // focal point: her face
+  grin: { cells: 130 },
+};
+const loaded = new Map<string, Promise<HTMLImageElement>>();
+function load(src: string) {
+  let p = loaded.get(src);
+  if (!p) {
+    p = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = import.meta.env.BASE_URL + src;
+    });
+    loaded.set(src, p);
+  }
+  return p;
+}
+
 function hash(n: number) {
   n = Math.imul(n ^ (n >>> 15), 0x2c1b3c6d);
   n = Math.imul(n ^ (n >>> 12), 0x297a2d39);
@@ -138,12 +195,15 @@ function hash(n: number) {
 const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let running = false;
 
-function go(url: string) {
-  try { sessionStorage.setItem('eink-arrival', '1'); } catch { /* private mode: plain arrival */ }
+/** Hand the last image to the next page, which fades it off (Base.astro). */
+function go(url: string, canvas: HTMLCanvasElement, w: number, h: number) {
+  try {
+    sessionStorage.setItem('eink-arrival', JSON.stringify({ src: canvas.toDataURL('image/png'), w, h }));
+  } catch { /* private mode: plain arrival */ }
   window.location.href = url;
 }
 
-export function einkTo(url: string) {
+export async function einkTo(url: string, name = 'maria-bonita') {
   if (running) return;
   if (reduced()) {
     window.location.href = url;
@@ -155,9 +215,16 @@ export function einkTo(url: string) {
   link.href = url;
   document.head.appendChild(link);
 
+  const spec = IMAGES[name] ?? IMAGES['maria-bonita'];
+  let source: HTMLImageElement | null = null;
+  if (spec.src) {
+    try { source = await load(spec.src); } catch { /* falls back to the grin */ }
+  }
+
   const W = window.innerWidth;
   const H = window.innerHeight;
-  const cell = Math.max(3, Math.round(Math.min(W, H) / 130));
+  // a photo needs finer pixels than the grin to keep a face
+  const cell = Math.max(source ? 2 : 3, Math.round(Math.min(W, H) / (source ? spec.cells : 130)));
   const cols = Math.ceil(W / cell);
   const rows = Math.ceil(H / cell);
 
@@ -181,7 +248,7 @@ export function einkTo(url: string) {
   const g = canvas.getContext('2d')!;
   const img = g.createImageData(cols, rows);
   const d = img.data;
-  const target = grin(cols, rows);
+  const target = source ? photo(cols, rows, source, spec.fx ?? 0.5, spec.fy ?? 0.5) : grin(cols, rows);
   const seed = (Math.random() * 1e9) | 0;
 
   // when each pixel starts refreshing: a sweep down the screen, broken up
@@ -214,7 +281,7 @@ export function einkTo(url: string) {
       fill(true);
     } else if (t < T.draw) {
       fill(false, 232); // translucent white: the old page ghosts through
-    } else if (t < T.out) {
+    } else {
       if (t > T.glitch && t < T.glitch + 70 && !glitch) {
         glitch = new Set();
         for (let k = 0; k < 6; k++) glitch.add(Math.floor(hash(seed + k * 7919) * (cols >> 3) * (rows >> 3)));
@@ -233,15 +300,11 @@ export function einkTo(url: string) {
           else put(i, on);
         }
       }
-    } else if (t < T.outBlack) {
-      for (let i = 0; i < cols * rows; i++) put(i, target[i] === 0);
-    } else {
-      fill(true);
     }
     g.putImageData(img, 0, 0);
 
     if (t < T.end) requestAnimationFrame(frame);
-    else go(url);
+    else go(url, canvas, cols * cell, rows * cell);
   };
   requestAnimationFrame(frame);
 }
@@ -252,13 +315,20 @@ export function einkTo(url: string) {
  * inactive row to the reading line.
  */
 export function installEink() {
-  if (!document.querySelector('a[data-special]')) return;
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('a[data-special]')];
+  if (!links.length) return;
+  if (!reduced()) {
+    for (const a of links) {
+      const src = IMAGES[a.dataset.special!]?.src;
+      if (src) load(src).catch(() => {});
+    }
+  }
   document.addEventListener('click', (e) => {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[data-special]');
     if (!a) return;
     e.preventDefault();
-    einkTo(a.href);
+    einkTo(a.href, a.dataset.special);
   });
   // Back button restores this page as it was left, under the layer: drop it.
   window.addEventListener('pageshow', (e) => {

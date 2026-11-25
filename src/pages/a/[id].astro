@@ -131,9 +131,9 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
   </main>
 
   <nav class="pager">
-    <a href={`${base}a/${previous.id}/`} data-special={previous.data.special || undefined}>← {previous.data.number}</a>
+    <a href={`${base}a/${previous.id}/`} data-special={previous.data.special}>← {previous.data.number}</a>
     <a href={base}>índice</a>
-    <a href={`${base}a/${next.id}/`} data-special={next.data.special || undefined}>{next.data.number} →</a>
+    <a href={`${base}a/${next.id}/`} data-special={next.data.special}>{next.data.number} →</a>
   </nav>
 
   <script type="application/json" id="data" set:html={JSON.stringify(ascii)} />

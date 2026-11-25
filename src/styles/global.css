@@ -63,25 +63,21 @@ a { color: inherit; text-decoration: none; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-/* E-ink transition, arrival side (see src/lib/eink.ts): the page opens on
-   black, flashes white, shows once in negative, then settles. No fades:
-   e-paper only ever switches. */
+/* E-ink transition, arrival side (see src/lib/eink.ts): the page opens
+   under the last e-ink image, which fades off slowly. The way in is abrupt;
+   the way out is gentle. */
 html.eink-arrival body::after {
   content: '';
   position: fixed;
   inset: 0;
   z-index: 1000;
   pointer-events: none;
-  background: #1b1b1b;
-  animation: eink-arrive 0.42s step-end 0.08s forwards;
+  background: #e6e6e1 var(--eink-src) 0 0 / var(--eink-size) no-repeat;
+  image-rendering: pixelated;
+  animation: eink-fade 1.4s cubic-bezier(0.4, 0, 0.2, 1) 0.25s forwards;
 }
 
-@keyframes eink-arrive {
-  0% { background: #1b1b1b; }
-  30% { background: #e6e6e1; }
-  60% { background: transparent; backdrop-filter: invert(1) grayscale(1); -webkit-backdrop-filter: invert(1) grayscale(1); }
-  100% { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; visibility: hidden; }
-}
+@keyframes eink-fade { to { opacity: 0; visibility: hidden; } }
 
 @media (prefers-reduced-motion: reduce) {
   html.eink-arrival body::after { display: none; }

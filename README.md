@@ -37,7 +37,7 @@ seed: 3                   # changes the order of the ASCII reveal
 charset: default          # default | blocks | kana
 brightness: max           # max (drops colour) | luma
 draft: false              # true hides the artifact
-special: false            # true opens it through the e-ink transition
+special: false            # true (or maria-bonita | grin) opens it through the e-ink transition
 blocks:
   - { type: photo, src: ./photos/01.jpg, caption: "35mm, hp5", pixelated: false }
   - { type: scan, src: ./scans/02.jpg }

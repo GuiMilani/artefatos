@@ -41,7 +41,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
       {Array.from({ length: copies }).flatMap((_, c) =>
         list.map(({ id, data }, i) => (
           <li class="item" data-i={i} aria-hidden={c !== middle ? 'true' : undefined}>
-            <a href={`${base}a/${id}/`} data-special={data.special || undefined} tabindex={c !== middle ? -1 : undefined}>
+            <a href={`${base}a/${id}/`} data-special={data.special} tabindex={c !== middle ? -1 : undefined}>
               <span class="num">{data.number}</span>
               <span class="name">{data.title}<span class="cursor" aria-hidden="true"></span></span>
               <span class="year">{data.year}</span>
@@ -145,7 +145,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
   import { typewrite } from '../lib/typewriter';
   import { einkTo, installEink } from '../lib/eink';
 
-  type Item = AsciiData & { id: string; url: string; number: string; title: string; info: string; special: boolean };
+  type Item = AsciiData & { id: string; url: string; number: string; title: string; info: string; special?: string };
 
   const items: Item[] = JSON.parse(document.getElementById('data')!.textContent!);
   const index = document.getElementById('index')!;
@@ -217,7 +217,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
   canvas.addEventListener('click', () => {
     if (active < 0) return;
     const d = items[active];
-    if (d.special) einkTo(d.url);
+    if (d.special) einkTo(d.url, d.special);
     else window.location.href = d.url;
   });
   installEink();
