@@ -9,7 +9,7 @@ import type { FakeLevel } from './fake-level';
 export type AsciiData = { lines: string[]; seed: number; accent: string; charset?: string };
 
 /** What a playing sound passes to `breathe`. */
-export type Breath = { level: FakeLevel; progress: number; t: number };
+export type Breath = { level: FakeLevel; progress: number; t: number }; // progress: where the band is, 0 top to 1 bottom
 
 const FONT_RATIO = 1.6;
 const DURATION_MS = 1400;
@@ -84,7 +84,7 @@ export class AsciiCanvas {
   /**
    * Redraws the cover shaken by a sound: characters move along the ramp in
    * proportion to the level of the column above them, most of all in a band
-   * that travels down the image with the track's progress. Passing null puts
+   * that travels down the image as the sound plays. Passing null puts
    * the cover back at rest.
    */
   breathe(b: Breath | null) {
