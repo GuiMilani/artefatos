@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import ChaoColumn from '../components/ChaoColumn.astro';
 
 interface Props {
   title: string;
@@ -39,7 +40,18 @@ const ogImage = new URL(`${import.meta.env.BASE_URL}og.jpg`, Astro.site).href;
     </script>
   </head>
   <body style={accent ? `--accent:${accent}` : undefined}>
+    <ChaoColumn />
     <slot />
+    <script is:inline>
+      // Labels follow the device language: Portuguese stays as written,
+      // any other language gets the English in data-en.
+      (() => {
+        const lang = (navigator.languages && navigator.languages[0]) || navigator.language || 'pt';
+        if (/^pt\b/i.test(lang)) return;
+        document.documentElement.lang = 'en';
+        document.querySelectorAll('[data-en]').forEach((el) => (el.textContent = el.dataset.en));
+      })();
+    </script>
     <script>
       import { einkArrive } from '../lib/eink';
       einkArrive();

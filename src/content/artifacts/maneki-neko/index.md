@@ -1,5 +1,5 @@
 ---
-number: "0003"
+number: "003"
 title: "maneki neko"
 year: "2026"
 period: "2026"
