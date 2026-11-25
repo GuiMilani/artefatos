@@ -5,7 +5,9 @@ import { en } from '../lib/i18n';
 import { coverToAscii } from '../lib/ascii';
 import SpinningSquare from '../components/SpinningSquare.astro';
 
-const list = await listArtifacts();
+// Oldest at the top, newest at the bottom: the page opens on the newest one,
+// with the older ones above it as a hint that the list scrolls.
+const list = (await listArtifacts()).reverse();
 const base = import.meta.env.BASE_URL;
 const total = list.length;
 const order = chronology(list);
@@ -32,7 +34,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
 <Base title="artefatos">
   <header class="header">
     <span class="brand"><SpinningSquare href={base} /><span>guilty corisco // artefatos</span></span>
-    <span id="counter" aria-live="polite">{pad(order.get(list[0]?.id) ?? 0)}/{pad(total)}</span>
+    <span id="counter" aria-live="polite">{pad(total)}/{pad(total)}</span>
   </header>
 
   <div class="stage" id="stage">
@@ -224,10 +226,10 @@ const pad = (n: number) => String(n).padStart(3, '0');
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', () => { fit(); onScroll(); });
 
+  // Open on the newest artifact, the last row (of the middle copy when looping).
   fit();
-  if (copies >= 3) {
-    window.dispatchEvent(new CustomEvent('scroll-jump', { detail: loopBlock() }));
-    window.scrollTo(0, loopBlock());
-  }
+  const start = (copies >= 3 ? loopBlock() : 0) + (total - 1) * rowHeight();
+  window.dispatchEvent(new CustomEvent('scroll-jump', { detail: start }));
+  window.scrollTo(0, start);
   activate(rawPosition());
 </script>

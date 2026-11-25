@@ -11,7 +11,7 @@ export async function listArtifacts(): Promise<Artifact[]> {
 
 /** Place of each artifact counted from the first one published (1 = oldest). */
 export function chronology(list: Artifact[]): Map<string, number> {
-  const oldest = [...list].reverse();
+  const oldest = [...list].sort((a, b) => Number(a.data.number) - Number(b.data.number));
   return new Map(oldest.map((a, i) => [a.id, i + 1]));
 }
 
