@@ -63,26 +63,26 @@ a { color: inherit; text-decoration: none; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-/* Ink transition, arrival side (see src/lib/ink.ts): the page opens on the
-   black the ink left behind, which lifts like a fading photocopy. */
-html.ink-arrival body::after {
+/* E-ink transition, arrival side (see src/lib/eink.ts): the page opens on
+   black, flashes white, shows once in negative, then settles. No fades:
+   e-paper only ever switches. */
+html.eink-arrival body::after {
   content: '';
   position: fixed;
-  inset: -50%;
+  inset: 0;
   z-index: 1000;
   pointer-events: none;
-  background-color: #161616;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  animation: ink-lift 1.1s cubic-bezier(0.6, 0, 0.3, 1) 0.15s forwards, ink-grain 0.12s steps(1) infinite;
+  background: #1b1b1b;
+  animation: eink-arrive 0.42s step-end 0.08s forwards;
 }
 
-@keyframes ink-lift { to { opacity: 0; visibility: hidden; } }
-@keyframes ink-grain {
-  0% { transform: translate(0, 0); }
-  33% { transform: translate(-7%, 4%); }
-  66% { transform: translate(5%, -6%); }
+@keyframes eink-arrive {
+  0% { background: #1b1b1b; }
+  30% { background: #e6e6e1; }
+  60% { background: transparent; backdrop-filter: invert(1) grayscale(1); -webkit-backdrop-filter: invert(1) grayscale(1); }
+  100% { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; visibility: hidden; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html.ink-arrival body::after { display: none; }
+  html.eink-arrival body::after { display: none; }
 }

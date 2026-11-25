@@ -22,12 +22,12 @@ const ogImage = new URL(`${import.meta.env.BASE_URL}og.jpg`, Astro.site).href;
     <meta name="twitter:card" content="summary_large_image" />
     <title>{title}</title>
     <script is:inline>
-      // Arriving through the ink transition (src/lib/ink.ts): open on black
-      // before the first paint, then fade the page in.
+      // Arriving through the e-ink transition (src/lib/eink.ts): open on black
+      // before the first paint, then refresh the page in.
       try {
-        if (sessionStorage.getItem('ink-arrival')) {
-          sessionStorage.removeItem('ink-arrival');
-          document.documentElement.classList.add('ink-arrival');
+        if (sessionStorage.getItem('eink-arrival')) {
+          sessionStorage.removeItem('eink-arrival');
+          document.documentElement.classList.add('eink-arrival');
         }
       } catch (e) {}
     </script>

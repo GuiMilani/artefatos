@@ -41,7 +41,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
       {Array.from({ length: copies }).flatMap((_, c) =>
         list.map(({ id, data }, i) => (
           <li class="item" data-i={i} aria-hidden={c !== middle ? 'true' : undefined}>
-            <a href={`${base}a/${id}/`} data-ink={data.special} tabindex={c !== middle ? -1 : undefined}>
+            <a href={`${base}a/${id}/`} data-special={data.special || undefined} tabindex={c !== middle ? -1 : undefined}>
               <span class="num">{data.number}</span>
               <span class="name">{data.title}<span class="cursor" aria-hidden="true"></span></span>
               <span class="year">{data.year}</span>
@@ -143,9 +143,9 @@ const pad = (n: number) => String(n).padStart(3, '0');
 <script>
   import { AsciiCanvas, type AsciiData } from '../lib/ascii-canvas';
   import { typewrite } from '../lib/typewriter';
-  import { inkTo, installInk } from '../lib/ink';
+  import { einkTo, installEink } from '../lib/eink';
 
-  type Item = AsciiData & { id: string; url: string; number: string; title: string; info: string; special?: string };
+  type Item = AsciiData & { id: string; url: string; number: string; title: string; info: string; special: boolean };
 
   const items: Item[] = JSON.parse(document.getElementById('data')!.textContent!);
   const index = document.getElementById('index')!;
@@ -214,13 +214,13 @@ const pad = (n: number) => String(n).padStart(3, '0');
     e.preventDefault();
     window.scrollTo({ top: rows.indexOf(li) * rowHeight(), behavior: 'smooth' });
   });
-  canvas.addEventListener('click', (e) => {
+  canvas.addEventListener('click', () => {
     if (active < 0) return;
     const d = items[active];
-    if (d.special) inkTo(d.url, d.special, e.clientX, e.clientY);
+    if (d.special) einkTo(d.url);
     else window.location.href = d.url;
   });
-  installInk();
+  installEink();
 
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', () => { fit(); onScroll(); });
