@@ -1,0 +1,102 @@
+---
+// A thin column of the two chao stencils (dark / angel) drifting up the right
+// edge, behind everything. Purely decorative.
+const base = import.meta.env.BASE_URL;
+const PAIRS = 10; // per half of the loop; the half must be taller than the viewport
+const sprites = Array.from({ length: PAIRS * 2 }, (_, i) => (i % 2 === 0 ? 'evil' : 'angel'));
+---
+<div class="chao" aria-hidden="true">
+  <div class="chao-track">
+    {[0, 1].map(() => (
+      <div class="chao-half">
+        {sprites.map((name) => (
+          <img src={`${base}chao/${name}.png`} class={`chao-${name}`} alt="" width="60" height="60" decoding="async" draggable="false" />
+        ))}
+      </div>
+    ))}
+  </div>
+</div>
+
+<style>
+  .chao {
+    --chao-w: 22px;
+    --chao-gap: 26px;
+    --chao-speed: 70s; /* time for one half of the track to pass */
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    right: 9px;
+    opacity: 0.45;
+    width: var(--chao-w);
+    overflow: hidden;
+    pointer-events: none;
+    user-select: none;
+    z-index: -1;
+  }
+
+  @media (min-width: 720px) {
+    .chao { --chao-w: 30px; --chao-gap: 34px; right: 16px; }
+  }
+
+  .chao-track {
+    display: flex;
+    flex-direction: column;
+    animation: chao-drift var(--chao-speed) linear infinite;
+    will-change: transform;
+  }
+
+  .chao-half {
+    display: flex;
+    flex-direction: column;
+    gap: var(--chao-gap);
+    padding-bottom: var(--chao-gap);
+  }
+
+  .chao img {
+    display: block;
+    width: 100%;
+    height: auto;
+    image-rendering: auto;
+  }
+
+  /* the dark one is wider than tall; keep both visually the same weight */
+  .chao .chao-evil { width: 100%; }
+  .chao .chao-angel { width: 72%; margin-inline: auto; }
+
+  @keyframes chao-drift {
+    from { transform: translateY(0); }
+    to { transform: translateY(-50%); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chao-track { animation: none; }
+  }
+</style>
+
+<script>
+  // Scrolling the page pushes the column a little faster, then it eases back.
+  const track = document.querySelector<HTMLElement>('.chao-track');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  const anim = track?.getAnimations()[0];
+  if (track && anim && !reduce.matches) {
+    let lastY = scrollY;
+    let boost = 0;
+    let raf = 0;
+    const tick = () => {
+      boost *= 0.92;
+      anim.playbackRate = 1 + boost;
+      raf = boost > 0.01 ? requestAnimationFrame(tick) : 0;
+      if (!raf) anim.playbackRate = 1;
+    };
+    addEventListener(
+      'scroll',
+      () => {
+        const dy = Math.abs(scrollY - lastY);
+        lastY = scrollY;
+        boost = Math.min(boost + dy / 40, 12);
+        if (!raf) raf = requestAnimationFrame(tick);
+      },
+      { passive: true },
+    );
+  }
+</script>
