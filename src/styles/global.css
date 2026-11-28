@@ -10,7 +10,32 @@
   --gutter: 16px;
   --header: 40px;
   --footer: 36px;
+  --cur-arrow: auto;
+  --cur-hand: pointer;
+  --cur-press: pointer;
 }
+
+/* Pixel cursor, only where there is a real mouse. Art pixels are 2 CSS px;
+   @2x files keep them crisp on retina. Plain url() first as a fallback for
+   browsers without image-set() in cursor. */
+@media (hover: hover) and (pointer: fine) {
+  :root {
+    --cur-arrow: url('/artefatos/cursor/arrow.png') 0 0, auto;
+    --cur-hand: url('/artefatos/cursor/hand.png') 9 0, pointer;
+    --cur-press: url('/artefatos/cursor/press.png') 9 0, pointer;
+  }
+  @supports (cursor: image-set(url('/artefatos/cursor/arrow.png') 1x) 0 0, auto) {
+    :root {
+      --cur-arrow: image-set(url('/artefatos/cursor/arrow.png') 1x, url('/artefatos/cursor/arrow@2x.png') 2x) 0 0, auto;
+      --cur-hand: image-set(url('/artefatos/cursor/hand.png') 1x, url('/artefatos/cursor/hand@2x.png') 2x) 9 0, pointer;
+      --cur-press: image-set(url('/artefatos/cursor/press.png') 1x, url('/artefatos/cursor/press@2x.png') 2x) 9 0, pointer;
+    }
+  }
+}
+
+html { cursor: var(--cur-arrow); }
+a, button { cursor: var(--cur-hand); }
+a:active, button:active { cursor: var(--cur-press); }
 
 *, *::before, *::after { box-sizing: border-box; }
 

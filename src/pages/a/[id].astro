@@ -223,7 +223,7 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
   .audio { border-top: 1px solid var(--ink); padding-top: 8px; }
   .audio button {
     all: unset;
-    cursor: pointer;
+    cursor: var(--cur-hand);
     display: grid;
     grid-template-columns: 2ch 1fr auto;
     gap: 1ch;
@@ -232,7 +232,7 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
     text-transform: lowercase;
   }
   .audio .state { color: var(--accent); }
-  .audio .meter { display: block; width: 100%; height: 44px; margin-top: 10px; cursor: pointer; touch-action: none; }
+  .audio .meter { display: block; width: 100%; height: 44px; margin-top: 10px; cursor: var(--cur-hand); touch-action: none; }
   .audio button:focus-visible, .audio .meter:focus-visible { outline: 1px dashed var(--accent); outline-offset: 3px; }
 
   /* Compact player: one line under the header while a sound plays and its
@@ -258,10 +258,10 @@ const has3d = data.blocks.some((b) => b.type === 'model3d');
     transition: opacity 0.24s steps(3), transform 0.24s steps(3);
   }
   .mini.on { opacity: 1; transform: none; pointer-events: auto; }
-  .mini button { all: unset; cursor: pointer; font: inherit; }
+  .mini button { all: unset; cursor: var(--cur-hand); font: inherit; }
   .mini-state { color: var(--accent); }
   .mini-track { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 16ch; }
-  .mini-meter { display: block; width: 100%; height: 14px; cursor: pointer; touch-action: none; }
+  .mini-meter { display: block; width: 100%; height: 14px; cursor: var(--cur-hand); touch-action: none; }
   .mini-time { color: var(--grey); font-variant-numeric: tabular-nums; }
   @media (prefers-reduced-motion: reduce) { .mini { transition: none; } }
 
