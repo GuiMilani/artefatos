@@ -49,7 +49,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
           <li class="item" data-i={i} aria-hidden={c !== middle ? 'true' : undefined}>
             <a href={`${base}a/${id}/`} data-special={data.special} tabindex={c !== middle ? -1 : undefined}>
               <span class="num">{data.number}</span>
-              <span class="name">{data.title}<span class="cursor" aria-hidden="true"></span></span>
+              <span class="name"><span class="title" data-title={data.title}>{data.title}</span><span class="cursor" aria-hidden="true"></span></span>
               <span class="year">{data.year}</span>
             </a>
           </li>
@@ -118,6 +118,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
 
   .name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-transform: lowercase; }
   .item .cursor { display: none; }
+  .item .cursor.typing { animation: none; } /* solid while typing, blinks once idle, like a terminal */
 
   .item.active { color: var(--ink); border-top-color: var(--ink); }
   .item.active .num { color: var(--accent); }
@@ -171,6 +172,20 @@ const pad = (n: number) => String(n).padStart(3, '0');
   const loopBlock = () => total * rowHeight();
 
   let active = -1;
+  let typed: HTMLElement | null = null;
+
+  // The focused name types itself in like the line below it; the one it
+  // leaves gets its whole name back at once.
+  function typeName(row: HTMLLIElement) {
+    const el = row.querySelector<HTMLElement>('.title')!;
+    if (typed === el) return;
+    if (typed) typewrite(typed, typed.dataset.title!, 0);
+    typed = el;
+    const cursor = row.querySelector<HTMLElement>('.cursor')!;
+    const text = el.dataset.title!;
+    cursor.classList.add('typing');
+    typewrite(el, text, 45, () => cursor.classList.remove('typing'));
+  }
 
   function rawPosition() {
     return Math.round(window.scrollY / rowHeight());
@@ -179,6 +194,7 @@ const pad = (n: number) => String(n).padStart(3, '0');
   function activate(k: number) {
     const i = ((k % total) + total) % total;
     rows.forEach((el, n) => el.classList.toggle('active', n === k));
+    if (rows[k]) typeName(rows[k]);
     if (i === active) return;
     active = i;
     const d = items[i];
@@ -229,6 +245,25 @@ const pad = (n: number) => String(n).padStart(3, '0');
     else flashTo(d.url);
   });
   installEink();
+
+  // Every 8 seconds without a touch, the focus moves on to another artifact, at random.
+  const CYCLE_MS = 8000;
+  const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let cycle = 0;
+  function restartCycle() {
+    clearInterval(cycle);
+    cycle = window.setInterval(() => {
+      if (document.hidden || total < 2 || active < 0) return;
+      let next = Math.floor(Math.random() * (total - 1));
+      if (next >= active) next++;
+      const k = rawPosition() - active + next; // same copy of the list
+      window.scrollTo({ top: k * rowHeight(), behavior: smooth ? 'smooth' : 'auto' });
+    }, CYCLE_MS);
+  }
+  for (const type of ['wheel', 'touchstart', 'pointerdown', 'keydown']) {
+    window.addEventListener(type, restartCycle, { passive: true });
+  }
+  restartCycle();
 
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', () => { fit(); onScroll(); });
