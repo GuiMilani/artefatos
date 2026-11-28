@@ -2,7 +2,7 @@
 // The square from the professional portfolio (guimilani.github.io): an outlined
 // square in the navigation bar that rotates as the page scrolls.
 // The original uses GSAP ScrollTrigger (5 full turns over 10,000px, scrub 0.2);
-// this reproduces the same mapping and easing without the dependency.
+// here it turns a bit more per pixel (8 turns), with the same easing and no dependency.
 interface Props {
   href: string;
   label?: string;
@@ -31,7 +31,7 @@ const { href, label = 'guilty corisco' } = Astro.props;
 </style>
 
 <script>
-  const DEGREES_PER_PX = (360 * 5) / 10000; // same as the professional site
+  const DEGREES_PER_PX = (360 * 8) / 10000;
   const SCRUB_SECONDS = 0.2;
 
   const square = document.getElementById('spinning-square');

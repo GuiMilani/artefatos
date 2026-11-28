@@ -5,7 +5,7 @@ import { RAMPS } from './ramps';
 
 export { RAMPS };
 
-export const COLUMNS = 120;
+export const COLUMNS = 150;
 
 /**
  * Turns a cover image into lines of text at build time. The browser only
